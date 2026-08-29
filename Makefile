@@ -22,7 +22,7 @@ build-all:
 	GOOS=darwin  GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/sdkz-darwin-arm64  ./cmd/sdkz
 	GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/sdkz-windows-amd64.exe ./cmd/sdkz
 	GOOS=windows GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(OUTDIR)/sdkz-windows-arm64.exe ./cmd/sdkz
-	@pkg=$(OUTDIR)/.pkg && rm -rf $$pkg && mkdir -p $$pkg && cd $(OUTDIR) && \
+	@pkg=$(CURDIR)/$(OUTDIR)/.pkg && rm -rf $$pkg && mkdir -p $$pkg && cd $(OUTDIR) && \
 	for f in sdkz-linux-amd64 sdkz-linux-arm64 sdkz-darwin-amd64 sdkz-darwin-arm64 sdkz-windows-amd64.exe sdkz-windows-arm64.exe; do \
 	  case $$f in \
 	    *.exe) inner=sdkz.exe ;; \
