@@ -83,7 +83,7 @@ func TestIntegrationInstallUseDefaultUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rel.Version != "21.0.5+11" {
+	if rel.Version != "21.0.5+11-tem" {
 		t.Fatalf("安装版本 = %q", rel.Version)
 	}
 	verDir := m.InstalledDir("java", rel.Version)
@@ -112,7 +112,7 @@ func TestIntegrationInstallUseDefaultUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(ublock, "JAVA_HOME") || !strings.Contains(ublock, "21.0.5+11") {
+	if !strings.Contains(ublock, "JAVA_HOME") || !strings.Contains(ublock, "21.0.5+11-tem") {
 		t.Errorf("use 输出异常: %s", ublock)
 	}
 

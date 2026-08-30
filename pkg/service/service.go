@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"sdkz/pkg/catalog"
 	"sdkz/pkg/config"
@@ -58,7 +59,7 @@ func NewWithConfig(cfg *config.Config) (*Manager, error) {
 	}
 	m := &Manager{
 		cfg:    cfg,
-		client: &http.Client{},
+		client: &http.Client{Timeout: 30 * time.Second},
 		Shell:  env.DetectShellOr("bash"),
 	}
 	m.Warn = func(format string, args ...any) {

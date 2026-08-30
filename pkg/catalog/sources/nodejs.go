@@ -11,6 +11,9 @@ import (
 
 const nodejsDefaultBase = "https://nodejs.org"
 
+// nodejsMirrorBase 国内可达的镜像（格式与官方 index.json 一致）。
+const nodejsMirrorBase = "https://registry.npmmirror.com/-/binary/node"
+
 type nodejs struct {
 	base
 	client *http.Client
@@ -52,15 +55,30 @@ func nodePlatformKey(p platform.Platform) string {
 	return ""
 }
 
+// fetchIndex 从官方源拉取版本清单，失败时回退到国内镜像。
+func (s *nodejs) fetchIndex(ctx context.Context) ([]nodeVersion, error) {
+	var versions []nodeVersion
+	url := s.join("/dist/index.json")
+	if err := getJSON(ctx, s.client, url, &versions); err == nil {
+		return versions, nil
+	}
+	// 回退镜像（与官方 index.json 字段一致）。
+	mirrorURL := nodejsMirrorBase + "/index.json"
+	var mirror []nodeVersion
+	if err := getJSON(ctx, s.client, mirrorURL, &mirror); err != nil {
+		return nil, fmt.Errorf("获取 Node.js 版本清单失败（官方源与镜像均不可达）: %w", err)
+	}
+	return mirror, nil
+}
+
 func (s *nodejs) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Release, error) {
 	key := nodePlatformKey(p)
 	if key == "" {
 		return nil, fmt.Errorf("Node.js 暂不支持平台 %s", p.String())
 	}
-	var versions []nodeVersion
-	url := s.join("/dist/index.json")
-	if err := getJSON(ctx, s.client, url, &versions); err != nil {
-		return nil, fmt.Errorf("获取 Node.js 版本清单失败: %w", err)
+	versions, err := s.fetchIndex(ctx)
+	if err != nil {
+		return nil, err
 	}
 	ext := "tar.gz"
 	if p.IsWindows() {
