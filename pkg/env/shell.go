@@ -155,16 +155,19 @@ foreach ($c in @("java","go","node","maven","gradle")) {
   }
 }
 function global:sdkz {
-  $raw = & (Get-Command sdkz -CommandType Application) @args *>&1 | Out-String
-  if ($raw -match '^# SDKZ_EXPORT') {
-    $lines = ($raw -split '\r?\n') | Select-Object -Skip 1
-    foreach ($line in $lines) {
-      if ($line -match '^\$env:(\w+)\s*=\s*"(.*)"$') {
-        Set-Item -Path "Env:$($matches[1])" -Value $matches[2]
-      }
-    }
+  $out = & (Get-Command sdkz -CommandType Application) @args 2>&1
+  $lines = if ($out -is [array]) { $out } else { @("$out") }
+  # 在输出中定位 # SDKZ_EXPORT 标记行（即使前面混入诊断信息也能找到）。
+  $idx = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^# SDKZ_EXPORT') { $idx = $i; break }
+  }
+  if ($idx -ge 0) {
+    # 逐行作为 PowerShell 语句执行（与 bash 的 eval 等价），
+    # 由 PowerShell 原生处理反斜杠路径与 $env:PATH 展开。
+    $lines | Select-Object -Skip ($idx + 1) | ForEach-Object { Invoke-Expression $_ }
   } else {
-    Write-Output $raw.TrimEnd()
+    $lines | ForEach-Object { Write-Output $_ }
   }
 }
 # <<< sdkz initialize <<<`
