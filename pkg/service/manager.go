@@ -270,40 +270,6 @@ func (m *Manager) Which(candID string) (string, error) {
 	return home + string(os.PathSeparator) + cand.BinDir, nil
 }
 
-// Upgrade 升级到该候选最新 GA（spec 为候选默认/latest）。
-func (m *Manager) Upgrade(ctx context.Context, candID, versionSpec string, choose ChooseFunc, prog ProgressFunc) (*domain.Release, error) {
-	cand, err := m.FindCandidate(candID)
-	if err != nil {
-		return nil, err
-	}
-	if versionSpec == "" || versionSpec == "lts" {
-		versionSpec = "latest"
-	}
-	cands, err := m.MatchReleases(ctx, cand, versionSpec, "")
-	if err != nil {
-		return nil, err
-	}
-	idx := 0
-	if len(cands) > 1 {
-		if choose != nil {
-			idx, err = choose(cands)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			idx = defaultChoice(cand, cands)
-		}
-	}
-	rel := cands[idx]
-	if m.ins.IsInstalled(candID, rel.Version) {
-		return rel, fmt.Errorf("%s 已是最新版本 %s: %w", candID, rel.Version, installer.ErrAlreadyInstalled)
-	}
-	if _, err := m.ins.Install(ctx, rel, prog); err != nil {
-		return nil, err
-	}
-	return rel, nil
-}
-
 // Init 注入 shell 集成，返回配置文件路径。
 func (m *Manager) Init(shell string) (string, error) {
 	return env.Inject(shell)
@@ -311,12 +277,6 @@ func (m *Manager) Init(shell string) (string, error) {
 
 // IsInjected 检查 shell 是否已集成。
 func (m *Manager) IsInjected(shell string) bool { return env.IsInjected(shell) }
-
-// SetOffline 设置离线模式并保存配置。
-func (m *Manager) SetOffline(v bool) error {
-	m.cfg.Offline = v
-	return m.cfg.Save()
-}
 
 // CleanCache 清空元数据缓存。
 func (m *Manager) CleanCache() error {

@@ -63,8 +63,6 @@ func init() {
 		newCurrentCmd(),
 		newHomeCmd(),
 		newEnvCmd(),
-		newUpgradeCmd(),
-		newOfflineCmd(),
 		newMirrorCmd(),
 		newCacheCmd(),
 		newDoctorCmd(),

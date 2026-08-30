@@ -13,7 +13,6 @@
   `*_HOME` 与 `bin` 写入**用户级环境变量**（HKCU\Environment，无需管理员），
   使得未运行 `sdkz init` 的 PowerShell / CMD / Git Bash 也能生效。
   （已删除早期的 `use` 仅当前会话命令，统一为 `default` 持久语义。）
-- 离线可用：版本元数据本地缓存，`offline` 模式不触网。
 - 面向 GUI：核心 `pkg/service` 暴露结构化结果 + 进度回调 + context 取消。
 
 非目标（v1 不做）：
@@ -35,7 +34,7 @@ $SDKZ_DIR                       # 默认 ~/.sdkz，可用环境变量 SDKZ_DIR �
 ├── tmp/                        # 下载(.part)与解压暂存（与 candidates 同盘，保证原子 rename）
 ├── metadata/
 │   └── candidates-<id>.json    # 各候选版本清单缓存（离线数据源）
-└── config.toml                 # 配置（镜像、offline、自更新仓库等）
+└── config.toml                 # 配置（镜像、自更新仓库等）
 ```
 
 PATH 只暴露 `$SDKZ_DIR/candidates/<c>/current/bin` 与对应 `*_HOME`，

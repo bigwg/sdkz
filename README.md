@@ -63,12 +63,14 @@
 开箱即用，无需安装 Go 工具链（从 GitHub Releases 下载预编译二进制）：
 
 ```bash
-# Linux / macOS
+# Linux / macOS / Windows (Git Bash)
 curl -fsSL https://raw.githubusercontent.com/bigwg/sdkz/main/scripts/install.sh | bash
 
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/bigwg/sdkz/main/scripts/install.ps1 | iex
 ```
+
+> Windows 的 Git Bash 里跑 `install.sh` 会自动转交 PowerShell 执行 `install.ps1`，无需手动切换。
 
 脚本会自动探测平台、安装二进制、写入 shell 集成。**重新打开终端后**：
 
@@ -110,8 +112,6 @@ sdkz install <c> [ver] [--vendor v]
 sdkz uninstall <c> <ver>
 sdkz default <c> <ver>     # 全局默认
 sdkz current [c] / home <c> <ver> / env
-sdkz upgrade <c>           # 主版本内升级
-sdkz offline on|off
 sdkz mirror add|list|use cn
 sdkz cache clean / doctor / selfupdate / version
 ```

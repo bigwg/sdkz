@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -95,7 +94,8 @@ func newSelfUpdateCmd() *cobra.Command {
 			}
 			repo := m.Config().SelfUpdateRepo
 			if repo == "" {
-				return fmt.Errorf("未配置 self_update_repo，请在 config.toml 中设置（如 self_update_repo = \"owner/repo\"）")
+				// 未显式配置时，默认使用本项目仓库。
+				repo = "bigwg/sdkz"
 			}
 			p := newProgressPrinter()
 			ver, err := selfupdate.Update(cmd.Context(), httpClient(), repo, p.OnProgress)
@@ -103,47 +103,6 @@ func newSelfUpdateCmd() *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "已更新到 %s\n", ver)
-			return nil
-		},
-	}
-}
-
-func newOfflineCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "offline <on|off>",
-		Short: "开启/关闭离线模式",
-		Long: `切换离线模式。开启后，list 等命令只使用本地缓存的元数据，不再联网拉取。
-
-参数:
-  on   开启离线模式（断网或加速启动时使用）
-  off  关闭离线模式（恢复联网拉取最新元数据）
-
-示例:
-  sdkz offline on
-  sdkz offline off`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			m, err := manager()
-			if err != nil {
-				return err
-			}
-			var v bool
-			switch strings.ToLower(args[0]) {
-			case "on", "true", "1":
-				v = true
-			case "off", "false", "0":
-				v = false
-			default:
-				return fmt.Errorf("参数必须为 on 或 off")
-			}
-			if err := m.SetOffline(v); err != nil {
-				return err
-			}
-			state := "开启"
-			if !v {
-				state = "关闭"
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "已%s离线模式\n", state)
 			return nil
 		},
 	}

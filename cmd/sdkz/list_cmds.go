@@ -118,7 +118,7 @@ func renderList(cmd *cobra.Command, m *service.Manager, candID, vendor string) e
 	installed, _ := m.ListInstalled(candID)
 	current, _ := m.Current(candID)
 	if len(rels) == 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s\n  （无可用版本：请检查网络，或运行 'sdkz doctor'；可尝试 'sdkz offline off'）\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n  （无可用版本：请检查网络，或运行 'sdkz doctor'）\n",
 			cand.Name)
 		return nil
 	}

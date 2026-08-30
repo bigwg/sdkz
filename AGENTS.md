@@ -20,7 +20,7 @@ cmd/sdkz/         # CLI 入口（cobra 命令定义）
   ├─ install_cmds.go  # install / uninstall
   ├─ switch_cmds.go   # default / current
   ├─ config_cmds.go   # 配置、镜像
-  └─ misc_cmds.go     # init / selfupdate / offline / doctor 等
+  └─ misc_cmds.go     # init / selfupdate / doctor 等
 pkg/
   ├─ domain/      # 核心领域模型（Release、Candidate、版本解析与排序）
   ├─ catalog/     # 候选源适配与版本聚合

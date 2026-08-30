@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# sdkz 一键安装脚本（Linux / macOS）
+# sdkz 一键安装脚本（Linux / macOS / Windows[Git Bash 等]）
 # 用法:
 #   curl -fsSL https://raw.githubusercontent.com/bigwg/sdkz/main/scripts/install.sh | bash
+# 说明:
+#   Linux/macOS 直接下载安装；Windows（Git Bash / MSYS / Cygwin）会自动委托
+#   PowerShell 执行官方 install.ps1，无需手动切换。
 # 环境变量:
-#   SDKZ_INSTALL_DIR  安装目录（默认 ~/.local/bin）
+#   SDKZ_INSTALL_DIR  安装目录（默认 ~/.local/bin，仅 Linux/macOS 生效）
 set -euo pipefail
 
 REPO="bigwg/sdkz"
@@ -22,7 +25,20 @@ case "$ARCH" in
 esac
 case "$OS" in
   linux|darwin) : ;;
-  *) err "不支持的系统: $OS（仅支持 Linux / macOS；Windows 请用 install.ps1）" ;;
+  # Windows 下（Git Bash / MSYS / Cygwin）直接委托 PowerShell 执行官方 install.ps1。
+  mingw*|msys*|cygwin*)
+    echo "检测到 Windows 环境（$(uname -s)），转交 PowerShell 安装脚本..."
+    if command -v powershell >/dev/null 2>&1; then
+      powershell -NoProfile -Command "irm https://raw.githubusercontent.com/${REPO}/main/scripts/install.ps1 | iex"
+      exit $?
+    elif command -v pwsh >/dev/null 2>&1; then
+      pwsh -NoProfile -Command "irm https://raw.githubusercontent.com/${REPO}/main/scripts/install.ps1 | iex"
+      exit $?
+    else
+      err "未找到 PowerShell，请手动在 PowerShell 中执行: irm https://raw.githubusercontent.com/${REPO}/main/scripts/install.ps1 | iex"
+    fi
+    ;;
+  *) err "不支持的系统: $OS（仅支持 Linux / macOS / Windows）" ;;
 esac
 
 ASSET="sdkz-${OS}-${ARCH}.tar.gz"

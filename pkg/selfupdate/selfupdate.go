@@ -70,7 +70,7 @@ func Update(ctx context.Context, client *http.Client, repo string, prog Progress
 	archive := filepath.Join(tmpDir, assetName)
 	if err := download.Download(ctx, client, assetURL, archive, func(done, total int64) {
 		if prog != nil {
-			prog(done, total, "下载")
+			prog(done, total, "更新下载")
 		}
 	}); err != nil {
 		return "", fmt.Errorf("下载更新失败: %w", err)
