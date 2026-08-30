@@ -28,6 +28,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: false
           files: |
             dist/sdkz-*.tar.gz
             dist/checksums.txt
