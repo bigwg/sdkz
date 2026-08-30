@@ -123,6 +123,35 @@ func matchPlatform(name string, p platform.Platform) bool {
 
 // ---- 各厂商版本提取 ----
 
+// archiveExt 返回支持的归档扩展名（.tar.gz / .zip），不支持则返回空。
+func archiveExt(name string) string {
+	switch {
+	case strings.HasSuffix(name, ".tar.gz"):
+		return ".tar.gz"
+	case strings.HasSuffix(name, ".zip"):
+		return ".zip"
+	}
+	return ""
+}
+
+// isDottedVersion 判断 s 是否为纯数字点分版本号（如 21.0.12.0.8）。
+var dottedVersionRe = regexp.MustCompile(`^\d+(\.\d+)*$`)
+
+func isDottedVersion(s string) bool { return dottedVersionRe.MatchString(s) }
+
+// isVersionToken 判断 s 是否以数字开头（兼容 SAP 的 27-ea.35 等）。
+func isVersionToken(s string) bool { return s != "" && s[0] >= '0' && s[0] <= '9' }
+
+// isChecksumOrMetadata 过滤签名、校验和、SBOM 等非二进制资产。
+func isChecksumOrMetadata(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".json") ||
+		strings.HasSuffix(lower, ".sha256.txt") ||
+		strings.HasSuffix(lower, ".sig") ||
+		strings.HasSuffix(lower, ".sha256") ||
+		strings.HasSuffix(lower, ".asc")
+}
+
 // parseKona 解析 Tencent Kona 资产名，兼容多种命名：
 //   TencentKona-21.0.12.b1-jdk_linux-aarch64.tar.gz -> 21.0.12
 //   TencentKona-11.0.32.b1-jdk_linux-x64.tar.gz     -> 11.0.32
@@ -132,6 +161,9 @@ func parseKona(name string, p platform.Platform) (string, bool) {
 		return "", false
 	}
 	if !strings.Contains(name, "TencentKona") {
+		return "", false
+	}
+	if isChecksumOrMetadata(name) || archiveExt(name) == "" {
 		return "", false
 	}
 	// 取 TencentKona 之后、首个 jdk/qdk 段之前的部分。
@@ -154,25 +186,37 @@ func parseKona(name string, p platform.Platform) (string, bool) {
 			rest = rest[:dot]
 		}
 	}
+	if !isDottedVersion(rest) {
+		return "", false
+	}
 	return rest, true
 }
 
 // parseDragonwell 解析 Alibaba Dragonwell 资产名：
 //   Alibaba_Dragonwell_Extended_21.0.11.0.11.10_x64_linux.tar.gz -> 21.0.11.0.11.10
 //   Alibaba_Dragonwell_21.0.12.0.8_x64_linux.tar.gz             -> 21.0.12.0.8
+//   Alibaba_Dragonwell_Standard_21.0.11.0.11.10_x64_windows.zip -> 21.0.11.0.11.10
 func parseDragonwell(name string, p platform.Platform) (string, bool) {
 	if !strings.Contains(name, "Dragonwell") || !matchPlatform(name, p) {
 		return "", false
 	}
-	if !strings.HasSuffix(name, ".tar.gz") {
+	if isChecksumOrMetadata(name) {
+		return "", false
+	}
+	ext := archiveExt(name)
+	if ext == "" {
 		return "", false
 	}
 	// 取最后一个 _<arch>_ 之前的版本段
-	parts := strings.Split(strings.TrimSuffix(name, ".tar.gz"), "_")
+	parts := strings.Split(strings.TrimSuffix(name, ext), "_")
 	// 找到 x64/aarch64 的位置，其前一段为版本
 	for i, part := range parts {
 		if part == ghArchMap[p.Arch] && i > 0 {
-			return parts[i-1], true
+			ver := parts[i-1]
+			if !isDottedVersion(ver) {
+				return "", false
+			}
+			return ver, true
 		}
 	}
 	return "", false
@@ -185,13 +229,19 @@ func parseSAP(name string, p platform.Platform) (string, bool) {
 	if !strings.HasPrefix(name, "sapmachine-jdk-") || !matchPlatform(name, p) {
 		return "", false
 	}
-	if !strings.Contains(name, "_bin.tar.gz") {
+	if isChecksumOrMetadata(name) || archiveExt(name) == "" {
+		return "", false
+	}
+	if !strings.Contains(name, "_bin") {
 		return "", false
 	}
 	rest := strings.TrimPrefix(name, "sapmachine-jdk-")
 	// 27-ea.35_linux-x64_bin -> 取 _ 之前
 	if idx := strings.Index(rest, "_"); idx >= 0 {
 		rest = rest[:idx]
+	}
+	if !isVersionToken(rest) {
+		return "", false
 	}
 	return rest, true
 }

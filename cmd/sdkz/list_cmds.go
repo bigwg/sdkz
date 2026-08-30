@@ -157,6 +157,19 @@ func renderList(cmd *cobra.Command, m *service.Manager, candID, vendor string) e
 	// 紧凑列表：每行 = 缩进 + 版本标识 + 对齐后的状态标记。
 	// 多厂商时按厂商分组，组头显示厂商名；单厂商直接列版本。
 	// 这种格式不依赖终端宽度，避免在窄终端里表格折行后错位。
+	if vendor == "" && len(cand.Vendors) > len(byVendor) {
+		var missing []string
+		for _, v := range cand.Vendors {
+			if _, ok := byVendor[v.ID]; !ok {
+				missing = append(missing, v.Name)
+			}
+		}
+		if len(missing) > 0 {
+			lines = append(lines, "")
+			lines = append(lines, colorStr(color, cYellow, fmt.Sprintf("  以下发行版未获取到版本（可能网络受限）: %s", strings.Join(missing, ", "))))
+		}
+	}
+
 	for _, vid := range vendorOrder {
 		v, _ := cand.FindVendor(vid)
 		vendorName := vid
