@@ -341,7 +341,7 @@ func pathContains(path, target string) bool {
 	return false
 }
 
-// psQuote 为 PowerShell 单引号字符串转义（' -> ''）。
+// psQuote 为 PowerShell 单引号字符串转义（' -> ”）。
 func psQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }

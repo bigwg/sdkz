@@ -153,9 +153,10 @@ func isChecksumOrMetadata(name string) bool {
 }
 
 // parseKona 解析 Tencent Kona 资产名，兼容多种命名：
-//   TencentKona-21.0.12.b1-jdk_linux-aarch64.tar.gz -> 21.0.12
-//   TencentKona-11.0.32.b1-jdk_linux-x64.tar.gz     -> 11.0.32
-//   TencentKona8.0.27.b1_qdk_linux-aarch64_8u502.tar.gz -> 8.0.27
+//
+//	TencentKona-21.0.12.b1-jdk_linux-aarch64.tar.gz -> 21.0.12
+//	TencentKona-11.0.32.b1-jdk_linux-x64.tar.gz     -> 11.0.32
+//	TencentKona8.0.27.b1_qdk_linux-aarch64_8u502.tar.gz -> 8.0.27
 func parseKona(name string, p platform.Platform) (string, bool) {
 	if !matchPlatform(name, p) {
 		return "", false
@@ -193,9 +194,10 @@ func parseKona(name string, p platform.Platform) (string, bool) {
 }
 
 // parseDragonwell 解析 Alibaba Dragonwell 资产名：
-//   Alibaba_Dragonwell_Extended_21.0.11.0.11.10_x64_linux.tar.gz -> 21.0.11.0.11.10
-//   Alibaba_Dragonwell_21.0.12.0.8_x64_linux.tar.gz             -> 21.0.12.0.8
-//   Alibaba_Dragonwell_Standard_21.0.11.0.11.10_x64_windows.zip -> 21.0.11.0.11.10
+//
+//	Alibaba_Dragonwell_Extended_21.0.11.0.11.10_x64_linux.tar.gz -> 21.0.11.0.11.10
+//	Alibaba_Dragonwell_21.0.12.0.8_x64_linux.tar.gz             -> 21.0.12.0.8
+//	Alibaba_Dragonwell_Standard_21.0.11.0.11.10_x64_windows.zip -> 21.0.11.0.11.10
 func parseDragonwell(name string, p platform.Platform) (string, bool) {
 	if !strings.Contains(name, "Dragonwell") || !matchPlatform(name, p) {
 		return "", false
@@ -223,8 +225,9 @@ func parseDragonwell(name string, p platform.Platform) (string, bool) {
 }
 
 // parseSAP 解析 SAP Machine 资产名：
-//   sapmachine-jdk-27-ea.35_linux-x64_bin.tar.gz -> 27-ea.35
-//   sapmachine-jdk-21.0.12_linux-aarch64_bin.tar.gz -> 21.0.12
+//
+//	sapmachine-jdk-27-ea.35_linux-x64_bin.tar.gz -> 27-ea.35
+//	sapmachine-jdk-21.0.12_linux-aarch64_bin.tar.gz -> 21.0.12
 func parseSAP(name string, p platform.Platform) (string, bool) {
 	if !strings.HasPrefix(name, "sapmachine-jdk-") || !matchPlatform(name, p) {
 		return "", false

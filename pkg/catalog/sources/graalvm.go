@@ -37,7 +37,8 @@ type ghAsset struct {
 
 // parseGraalAsset 解析 GraalVM 资产名，返回 (版本段, 是否匹配当前平台)。
 // 名称形如：graalvm-community-jdk-25i3-25.0.4.1_linux-aarch64_bin.tar.gz
-//   版本段可能带迭代号前缀（如 25i3-25.0.4.1），此处取其中的点分版本号 25.0.4.1。
+//
+//	版本段可能带迭代号前缀（如 25i3-25.0.4.1），此处取其中的点分版本号 25.0.4.1。
 func parseGraalAsset(name string, p platform.Platform) (bool, string) {
 	base := strings.TrimSuffix(name, ".tar.gz")
 	if strings.HasSuffix(name, ".zip") {

@@ -58,13 +58,13 @@ func newInstallCmd() *cobra.Command {
 			if err != nil {
 				if errors.Is(err, installer.ErrAlreadyInstalled) {
 					return fmt.Errorf("%s %s 已安装（可用 sdkz default 切换为全局默认）", candID, rel.Version)
-					}
-					return err
-					}
-					fmt.Fprintf(cmd.OutOrStdout(), "已安装 %s %s\n", candID, rel.Version)
-					fmt.Fprintf(cmd.OutOrStdout(), "运行 sdkz default %s %s 设为全局默认（Windows 需新开终端生效）\n",
-					candID, rel.Version)
-					return nil
+				}
+				return err
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "已安装 %s %s\n", candID, rel.Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "运行 sdkz default %s %s 设为全局默认（Windows 需新开终端生效）\n",
+				candID, rel.Version)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&vendor, "vendor", "", "指定发行版（如 tem/zul/graal）")
