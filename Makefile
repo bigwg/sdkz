@@ -28,7 +28,7 @@ build-all:
 	    *.exe) inner=sdkz.exe ;; \
 	    *)     inner=sdkz ;; \
 	  esac; \
-	  cp $$f $$pkg/$$inner && tar -czf $$f.tar.gz -C $$pkg $$inner && rm -f $$pkg/$$inner; \
+	  cp $$f $$pkg/$$inner && tar -czf $${f%.exe}.tar.gz -C $$pkg $$inner && rm -f $$pkg/$$inner; \
 	done; \
 	rm -rf $$pkg; \
 	( command -v sha256sum >/dev/null && sha256sum sdkz-*.tar.gz || shasum -a 256 sdkz-*.tar.gz ) > checksums.txt && \
