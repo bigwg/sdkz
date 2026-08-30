@@ -18,7 +18,7 @@ cmd/sdkz/         # CLI 入口（cobra 命令定义）
   ├─ root.go          # 根命令、全局 flag、命令装配
   ├─ list_cmds.go     # list / ls 命令与展示层
   ├─ install_cmds.go  # install / uninstall
-  ├─ switch_cmds.go   # use / default / current
+  ├─ switch_cmds.go   # default / current
   ├─ config_cmds.go   # 配置、镜像
   └─ misc_cmds.go     # init / selfupdate / offline / doctor 等
 pkg/

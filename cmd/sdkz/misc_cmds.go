@@ -29,7 +29,8 @@ func newInitCmd() *cobra.Command {
 		Use:   "init [shell]",
 		Short: "注入 shell 集成（写入 rc 配置文件）",
 		Long: `将 sdkz 初始化块写入你的 shell 配置文件，使 sdkz 管理的 PATH 与
-*_HOME 环境变量自动生效，并支持 use/default 在当前终端立即生效。
+*_HOME 环境变量自动生效，并支持 default 在当前终端立即生效（已 init 的 shell）。
+Windows 上 default 还会写入用户级环境变量，无需 init 即可在 PowerShell/CMD/Git Bash 生效。
 
 支持的 shell（参数可填其一）:
   bash    写入 ~/.bashrc

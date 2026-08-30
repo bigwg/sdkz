@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"sdkz/pkg/domain"
 	"sdkz/pkg/env"
 	"sdkz/pkg/installer"
+	"sdkz/pkg/linker"
 )
 
 // ErrNeedChoice 表示需要用户在多个发行版中做出选择。
@@ -188,21 +191,9 @@ func (m *Manager) Uninstall(candID, ver string) error {
 	return nil
 }
 
-// Use 使版本仅对当前 shell 生效：返回可 eval 的 export 块。
-func (m *Manager) Use(candID, ver string) (string, error) {
-	cand, err := m.FindCandidate(candID)
-	if err != nil {
-		return "", err
-	}
-	if !m.ins.IsInstalled(candID, ver) {
-		return "", fmt.Errorf("%s %s 未安装，请先运行 sdkz install", candID, ver)
-	}
-	dir := m.InstalledDir(candID, ver)
-	block := env.ExportBlock(cand, dir, m.Shell)
-	return block.String(), nil
-}
-
 // SetDefault 将版本设为全局默认（更新 current 指针），并返回可 eval 的 export 块。
+// Windows 上还会将 *_HOME 与 bin 路径持久写入用户级环境变量（HKCU\Environment），
+// 使得即使未运行 sdkz init、无 shell 集成，PowerShell / CMD / Git Bash 也能生效。
 func (m *Manager) SetDefault(candID, ver string) (string, error) {
 	cand, err := m.FindCandidate(candID)
 	if err != nil {
@@ -216,6 +207,17 @@ func (m *Manager) SetDefault(candID, ver string) (string, error) {
 		return "", err
 	}
 	curDir := m.InstalledDir(candID, "current")
+	binDir := filepath.Join(curDir, cand.BinDir)
+	if runtime.GOOS == "windows" {
+		if err := linker.SetUserEnvWindows(linker.UserEnv{
+			HomeEnv: cand.HomeEnv,
+			HomeDir: curDir,
+			BinDir:  binDir,
+		}); err != nil {
+			// 用户级环境变量写入失败不应阻断 default，仅告警。
+			warnf("写入用户级环境变量失败（不影响指针切换）: %v", err)
+		}
+	}
 	block := env.ExportBlock(cand, curDir, m.Shell)
 	return block.String(), nil
 }
@@ -230,6 +232,11 @@ func (m *Manager) EnvBlock() string {
 		return m.InstalledDir(c.ID, "current"), true
 	})
 	return block.String()
+}
+
+// warnf 输出非致命告警到 stderr（Windows 用户级环境变量写入失败时软降级）。
+func warnf(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "警告: "+format+"\n", args...)
 }
 
 // Home 返回版本目录路径（ver 为空返回 current 目录）。

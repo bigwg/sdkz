@@ -9,13 +9,15 @@
 - 跨平台：Linux / macOS / Windows，**Windows 免管理员、免开发者模式**。
 - 多候选：v1 支持 Java (JDK)、Go、Node.js、Maven、Gradle。
 - 多发行版：Java 支持 Temurin / Azul Zulu / GraalVM（vendor 抽象）。
-- 版本切换双作用域：`default` 全局持久化（改 current 指针，新终端生效）；
-  `use` 仅当前 shell 生效（eval 输出 export，退出 shell 自动恢复）。
+- 版本切换：`default` 全局持久化（更新 current 指针）。Windows 上还会将
+  `*_HOME` 与 `bin` 写入**用户级环境变量**（HKCU\Environment，无需管理员），
+  使得未运行 `sdkz init` 的 PowerShell / CMD / Git Bash 也能生效。
+  （已删除早期的 `use` 仅当前会话命令，统一为 `default` 持久语义。）
 - 离线可用：版本元数据本地缓存，`offline` 模式不触网。
 - 面向 GUI：核心 `pkg/service` 暴露结构化结果 + 进度回调 + context 取消。
 
 非目标（v1 不做）：
-- 全局环境变量注册表写入（靠 shell profile + current 指针实现持久化）。
+- 全局（系统级 / 机器级）环境变量写入（`setx /M` 需管理员，已避开）。
 - 用户自定义候选（设计预留扩展点，见 §9）。
 - 断点续传以外的下载高级特性（多线程分片等）。
 
@@ -145,12 +147,13 @@ type Artifact struct {
 - 初始化块内容：
   - 依次检查各候选 `current/bin`，存在则前插 PATH 并导出对应 `*_HOME`。
   - 定义 `sdkz()` shell 函数：调用真实二进制；stdout 以 `# SDKZ_EXPORT` 开头时
-    eval 其余行（`use` / `default` 生效到当前会话），否则原样打印。stderr 透传。
-- `sdkz use <c> <v>`：不改指针，stdout 输出指向**具体版本目录**的 export 块（eval 后当前会话生效，退出即恢复）。
-- `sdkz default <c> <v>`：更新 current 指针（新终端生效），若在函数会话内同时输出 export 块（立即生效）。
+    eval 其余行（`default` 在当前会话立即生效），否则原样打印。stderr 透传。
+- `sdkz default <c> <v>`：更新 current 指针（新终端生效）；Windows 上额外写入用户级
+  环境变量（无需 init 即可在 PowerShell/CMD/Git Bash 生效）。已 init 的 shell 通过函数
+  会话内的 export 块立即生效。
 - `sdkz env`：输出当前所有候选的 export 块（可用于手动 eval 或 CI）。
 
-PowerShell 注意：`*>&1` 混流后用 `Invoke-Expression` 处理 export 行（仅 use/default 触发，无进度输出，风险可控）。
+PowerShell 注意：`*>&1` 混流后用 `Invoke-Expression` 处理 export 行（仅 default 触发，无进度输出，风险可控）。
 
 ## 9. 扩展点
 

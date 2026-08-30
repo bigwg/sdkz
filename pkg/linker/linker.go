@@ -12,6 +12,17 @@ import (
 	"strings"
 )
 
+// envVarName 返回候选对应的 *_HOME 类环境变量名（小写形式用于内部映射）。
+// 注意：本文件只负责 Windows 用户级环境变量的设置，与 domain.Candidate 解耦，
+// 由调用方传入 homeEnv（如 JAVA_HOME）与 binDir（版本目录下的 bin 子目录绝对路径）。
+
+// UserEnv 描述要为某候选写入的用户级环境变量。
+type UserEnv struct {
+	HomeEnv string // 如 JAVA_HOME / GOROOT / MAVEN_HOME / GRADLE_HOME，可为空
+	HomeDir string // 版本目录绝对路径，写入 *_HOME
+	BinDir  string // 版本目录下的 bin 绝对路径，追加进 PATH（去重）
+}
+
 // Mode 表示指针实现模式。
 type Mode int
 
@@ -253,4 +264,84 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, fi.Mode().Perm())
+}
+
+// SetUserEnvWindows 在 Windows 上将环境变量持久写入用户级（HKCU\Environment）。
+// - HomeEnv/HomeDir：写入用户级 *_HOME（如 JAVA_HOME）。HomeEnv 为空则跳过。
+// - BinDir：以去重方式追加进用户级 PATH（若已存在则不动 PATH）。
+// 使用 setx 命令实现，对 PowerShell / CMD / Git Bash 均通用，无需管理员权限。
+// 注意：setx 仅影响未来进程；当前进程不会因此变更（调用方如需当前进程也生效，
+// 应另行在进程内赋值）。
+func SetUserEnvWindows(e UserEnv) error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("SetUserEnvWindows 仅支持 Windows")
+	}
+	if e.HomeEnv != "" && e.HomeDir != "" {
+		if err := setxUser(e.HomeEnv, e.HomeDir); err != nil {
+			return fmt.Errorf("设置 %s 失败: %w", e.HomeEnv, err)
+		}
+	}
+	if e.BinDir != "" {
+		if err := appendUserPathIfMissing(e.BinDir); err != nil {
+			return fmt.Errorf("更新 PATH 失败: %w", err)
+		}
+	}
+	return nil
+}
+
+// setxUser 调用 setx 设置用户级环境变量（无需管理员）。
+func setxUser(key, value string) error {
+	cmd := exec.Command("cmd", "/c", "setx", key, value)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// appendUserPathIfMissing 将 dir 以去重方式追加进用户级 PATH。
+// 通过读取当前用户 PATH（从注册表经由 setx 的回显不可靠，故用 PowerShell 读取），
+// 拼接后写回，避免每次切换导致 PATH 无限膨胀。
+func appendUserPathIfMissing(dir string) error {
+	// 用 PowerShell 读取用户级 PATH 当前值。
+	getCmd := exec.Command("powershell", "-NoProfile", "-Command",
+		"[Environment]::GetEnvironmentVariable('PATH','User')")
+	out, err := getCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("读取用户 PATH 失败: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+	cur := strings.TrimRight(strings.TrimSpace(string(out)), "\r\n")
+	if pathContains(cur, dir) {
+		return nil // 已存在，无需重复追加
+	}
+	add := dir
+	if cur != "" {
+		add = cur + ";" + dir
+	}
+	setCmd := exec.Command("powershell", "-NoProfile", "-Command",
+		fmt.Sprintf("[Environment]::SetEnvironmentVariable('PATH',%s,'User')", psQuote(add)))
+	if out2, err2 := setCmd.CombinedOutput(); err2 != nil {
+		return fmt.Errorf("写入用户 PATH 失败: %v: %s", err2, strings.TrimSpace(string(out2)))
+	}
+	return nil
+}
+
+// pathContains 判断 Windows PATH（分号分隔）是否已包含 target（大小写不敏感）。
+func pathContains(path, target string) bool {
+	target = strings.ToLower(filepath.Clean(target))
+	for _, p := range strings.Split(path, ";") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.ToLower(filepath.Clean(p)) == target {
+			return true
+		}
+	}
+	return false
+}
+
+// psQuote 为 PowerShell 单引号字符串转义（' -> ''）。
+func psQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }

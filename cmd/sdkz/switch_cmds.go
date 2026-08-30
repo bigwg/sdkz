@@ -2,56 +2,25 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
 
-// newUseCmd 生成 use 命令。
-// 重要：stdout 输出的是可被 shell 函数 eval 的 export 块（带标记行），
-// 因此任何附加信息必须走 stderr。
-func newUseCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "use <candidate> <version>",
-		Short: "切换版本（仅当前 shell 会话生效）",
-		Long: `将当前 shell 会话切换到指定已安装版本，仅对当前终端生效，退出终端后恢复。
-
-前提:
-  1. 已运行 "sdkz init" 完成 shell 集成（由 sdkz() 包装函数执行导出的环境变量）
-  2. 目标版本已安装（用 "sdkz ls" 查看）
-
-参数:
-  candidate  必填，支持的 SDK: java, go, node, maven, gradle
-  version    必填，要切换到的已安装版本
-
-示例:
-  sdkz use java 21.0.2
-  sdkz use node 20`,
-		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			m, err := manager()
-			if err != nil {
-				return err
-			}
-			block, err := m.Use(args[0], args[1])
-			if err != nil {
-				return err
-			}
-			// 供 shell 函数 eval。
-			fmt.Fprint(cmd.OutOrStdout(), block)
-			return nil
-		},
-	}
-}
-
+// newDefaultCmd 生成 default 命令。
+// Windows 上除更新 current 指针外，还会将 *_HOME 与 bin 写入用户级环境变量，
+// 使未运行 sdkz init 的 PowerShell / CMD / Git Bash 也能生效（需新开终端）。
+// 已运行 sdkz init 的 shell（bash/zsh/fish）会通过 sdkz() 函数 eval 导出的块即时生效。
 func newDefaultCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "default <candidate> <version>",
-		Short: "设置全局默认版本（新终端自动生效）",
+		Short: "设置全局默认版本（持久生效）",
 		Long: `将版本设为全局默认（更新 current 指针），之后所有新开的终端自动使用该版本。
 
-与 use 的区别:
-  default  持久化，影响 future 新终端（写入 current 指针）
-  use      仅当前 shell 会话临时切换
+平台行为:
+  - Windows: 自动写入用户级环境变量（JAVA_HOME / PATH 等），PowerShell / CMD / Git Bash
+    无需 sdkz init 即可生效；已打开的终端需新开后才能看到变更（Windows 机制限制）。
+  - Linux / macOS: 更新 current 软链；已 sdkz init 的 shell 即时生效，否则新终端生效。
 
 参数:
   candidate  必填，支持的 SDK: java, go, node, maven, gradle
@@ -69,8 +38,14 @@ func newDefaultCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// 供已 init 的 shell（bash/zsh/fish）sdkz() 函数 eval，即时生效。
 			fmt.Fprint(cmd.OutOrStdout(), block)
-			fmt.Fprintf(stderr(), "已将 %s 默认版本设为 %s（新终端生效）\n", args[0], args[1])
+			fmt.Fprintf(stderr(), "已将 %s 默认版本设为 %s\n", args[0], args[1])
+			if runtime.GOOS == "windows" {
+				fmt.Fprintln(stderr(), "Windows: 已写入用户级环境变量，请新开终端后生效（当前窗口可执行上面输出的导出语句立即生效）。")
+			} else {
+				fmt.Fprintln(stderr(), "新开终端或运行 'source <(~/.sdkz ...)' 后生效；已 init 的 shell 当前会话即时生效。")
+			}
 			return nil
 		},
 	}

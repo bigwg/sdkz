@@ -219,7 +219,7 @@ func renderList(cmd *cobra.Command, m *service.Manager, candID, vendor string) e
 	}
 	lines = append(lines, "")
 	lines = append(lines, fmt.Sprintf("安装: sdkz install %s <标识>%s", candID, vendorHint(candID, vendor)))
-	lines = append(lines, fmt.Sprintf("切换: sdkz use %s <标识> (会话) | sdkz default %s <标识> (全局)", candID, candID))
+	lines = append(lines, fmt.Sprintf("设为默认: sdkz default %s <标识>", candID))
 	lines = append(lines, "图例: * 当前使用   > 已安装   lts LTS版本")
 	outputLines(cmd.OutOrStdout(), lines)
 	return nil
@@ -321,7 +321,7 @@ func renderInstalled(cmd *cobra.Command, m *service.Manager, candID string) erro
 		lines = append(lines, fmt.Sprintf("  %s%s%s", verStr, strings.Repeat(" ", pad+2), mark))
 	}
 	lines = append(lines, "")
-	lines = append(lines, "图例: * 当前使用   切换: sdkz use "+candID+" <版本>")
+	lines = append(lines, "图例: * 当前使用   设为默认: sdkz default "+candID+" <版本>")
 	outputLines(cmd.OutOrStdout(), lines)
 	return nil
 }

@@ -157,14 +157,14 @@ foreach ($c in @("java","go","node","maven","gradle")) {
 function global:sdkz {
   $out = & (Get-Command sdkz -CommandType Application) @args 2>&1
   $lines = if ($out -is [array]) { $out } else { @("$out") }
-  # 在输出中定位 # SDKZ_EXPORT 标记行（即使前面混入诊断信息也能找到）。
+  # locate the # SDKZ_EXPORT marker line even if diagnostic output precedes it.
   $idx = -1
   for ($i = 0; $i -lt $lines.Count; $i++) {
     if ($lines[$i] -match '^# SDKZ_EXPORT') { $idx = $i; break }
   }
   if ($idx -ge 0) {
-    # 逐行作为 PowerShell 语句执行（与 bash 的 eval 等价），
-    # 由 PowerShell 原生处理反斜杠路径与 $env:PATH 展开。
+    # run each remaining line as a PowerShell statement (equivalent to bash eval),
+    # letting PowerShell handle backslash paths and $env:PATH expansion natively.
     $lines | Select-Object -Skip ($idx + 1) | ForEach-Object { Invoke-Expression $_ }
   } else {
     $lines | ForEach-Object { Write-Output $_ }
@@ -174,7 +174,9 @@ function global:sdkz {
 }
 
 // Inject 幂等地将初始化块写入 shell 配置文件。
-// 已存在时整体替换标记区间。返回写入的文件路径。
+// 会先移除文件中所有已存在的 sdkz 初始化块（无论数量、是否损坏/粘连），
+// 再在末尾追加一份当前版本，因此重复执行 init 不会产生重复或叠加乱码块。
+// 返回写入的文件路径。
 func Inject(shell string) (string, error) {
 	rc := RCPath(shell)
 	if rc == "" {
@@ -185,11 +187,13 @@ func Inject(shell string) (string, error) {
 	if data, err := os.ReadFile(rc); err == nil {
 		content = string(data)
 	}
-	newContent := replaceBlock(content, snippet)
-	if newContent == content {
-		// 无变化也确保文件存在（内容为空时）。
-		newContent = content + snippet
+	clean := removeAllBlocks(content)
+	// 确保块前后有换行分隔，避免与用户内容粘连。
+	newContent := clean
+	if strings.TrimSpace(newContent) != "" && !strings.HasSuffix(newContent, "\n") {
+		newContent += "\n"
 	}
+	newContent += snippet + "\n"
 	if err := os.MkdirAll(filepath.Dir(rc), 0o755); err != nil {
 		return "", err
 	}
@@ -199,22 +203,40 @@ func Inject(shell string) (string, error) {
 	return rc, nil
 }
 
-// replaceBlock 替换文本中的标记区间；无标记则追加。
-func replaceBlock(content, snippet string) string {
-	start := strings.Index(content, markerBegin)
-	end := strings.Index(content, markerEnd)
-	if start < 0 || end < 0 || end < start {
-		if strings.TrimSpace(content) == "" {
-			return snippet + "\n"
+// removeAllBlocks 删除文本中所有由 markerBegin/markerEnd 包裹的 sdkz 初始化块。
+// 对标记粘连、损坏或嵌套的情况同样安全：只要出现 begin 就向前寻找配对的 end，
+// 找不到 end 则删除到行尾，避免残留半块。
+func removeAllBlocks(content string) string {
+	var b strings.Builder
+	rest := content
+	for {
+		start := strings.Index(rest, markerBegin)
+		if start < 0 {
+			b.WriteString(rest)
+			break
 		}
-		return content + "\n" + snippet + "\n"
+		// 保留 begin 之前的内容。
+		b.WriteString(rest[:start])
+		// 从 begin 之后寻找配对 end。
+		afterBegin := rest[start+len(markerBegin):]
+		end := strings.Index(afterBegin, markerEnd)
+		if end < 0 {
+			// 没有配对的 end：视为整块损坏到文件末尾，删除剩余全部。
+			// 真实场景中 sdkz 块总是追加在文件末尾，半块仅出现在尾部，
+			// 这样可避免残留半块导致下次 init 时重复累积。
+			rest = ""
+			break
+		}
+		// 跳过 end 及其后的尾随换行。
+		afterEnd := afterBegin[end+len(markerEnd):]
+		for len(afterEnd) > 0 && (afterEnd[0] == '\n' || afterEnd[0] == '\r') {
+			afterEnd = afterEnd[1:]
+		}
+		rest = afterEnd
 	}
-	end += len(markerEnd)
-	// 去掉标记块尾随换行。
-	for end < len(content) && (content[end] == '\n' || content[end] == '\r') {
-		end++
-	}
-	return content[:start] + snippet + "\n" + content[end:]
+	res := b.String()
+	// 收尾：若结尾残留多余空行则压缩，但保留用户原有空行结构不做激进处理。
+	return res
 }
 
 // IsInjected 判断配置文件是否已注入初始化块。

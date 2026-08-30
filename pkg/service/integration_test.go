@@ -107,16 +107,7 @@ func TestIntegrationInstallUseDefaultUninstall(t *testing.T) {
 		t.Errorf("Current = %q", cur)
 	}
 
-	// 3. use（当前 shell 生效）。
-	ublock, err := m.Use("java", rel.Version)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(ublock, "JAVA_HOME") || !strings.Contains(ublock, "21.0.5+11-tem") {
-		t.Errorf("use 输出异常: %s", ublock)
-	}
-
-	// 4. 已安装列表。
+	// 3. 已安装列表。
 	installed, err := m.ListInstalled("java")
 	if err != nil || len(installed) != 1 {
 		t.Fatalf("ListInstalled = %v, err=%v", installed, err)

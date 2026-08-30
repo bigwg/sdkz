@@ -42,7 +42,7 @@
 
 - 跨语言：Java / Go / Node.js / Maven / Gradle，一个 `sdkz` 全包
 - 跨平台：同一命令、同一配置文件，三端行为一致（Windows 免管理员权限）
-- 一个心智模型：`install` / `use` / `default` 对所有语言通用，无需切换工具
+- 一个心智模型：`install` / `default` 对所有语言通用，无需切换工具
 
 ---
 
@@ -51,7 +51,7 @@
 - **跨语言统一**：Java (JDK) / Go / Node.js / Maven / Gradle 一套命令管理
 - **跨平台一致**：Linux / macOS / Windows，命令、配置、行为三端对齐（Windows 免管理员）
 - **Java 多发行版**：Temurin / Azul Zulu / GraalVM / Tencent Kona / Alibaba Dragonwell / SAP Machine，可指定 `--vendor`
-- **双作用域切换**：`default` 全局生效，`use` 仅当前 shell 生效
+- **持久生效**：`default` 设置全局默认版本，跨终端、跨 shell 一致生效
 - **离线可用**：元数据本地缓存 + 国内镜像加速
 - **安全可靠**：sha256 校验 + 原子安装 + current 指针自动降级（symlink → junction → copy）
 - **单文件二进制**：Go 实现，无运行时依赖，开箱即用
@@ -81,13 +81,22 @@ sdkz list go
 # 安装与切换（所有语言命令一致）
 sdkz install java 21        # 安装 Java 21（默认 Temurin）
 sdkz install node 20        # 安装 Node.js 20
-sdkz use java 21            # 当前 shell 使用 Java 21
+sdkz default java 21        # 全局默认 Java 21
 sdkz default node 20        # 全局默认 Node.js 20
 ```
 
-> 不同语言、不同平台，用的都是同一套 `install` / `use` / `default` —— 这就是 sdkz 存在的意义。
+> 不同语言、不同平台，用的都是同一套 `install` / `default` —— 这就是 sdkz 存在的意义。
 
 后续升级自身：`sdkz selfupdate`（无需重新跑安装脚本）。
+
+### Windows 上的 `default`
+
+在 Windows 上，`sdkz default` 除了更新 `current` 指针，还会**自动把 `JAVA_HOME`（及 `PATH` 中的 `bin` 目录）写入用户级环境变量**（HKCU\Environment，无需管理员权限、无需 `sdkz init`）。因此：
+
+- **PowerShell / CMD / Git Bash 全部通用**，即使从未运行过 `sdkz init` 也能生效；
+- 已打开的终端需**新开一个窗口**才能看到变更（Windows 环境变量机制限制：已启动进程不会自动继承新写入的用户级变量）。
+
+如需当前窗口立即生效，可在已 `sdkz init` 的 shell 中执行 `default` 输出的导出语句，或新开终端。
 
 ---
 
@@ -99,7 +108,6 @@ sdkz list [candidate]      # 可安装版本
 sdkz ls [candidate]        # 已安装版本
 sdkz install <c> [ver] [--vendor v]
 sdkz uninstall <c> <ver>
-sdkz use <c> <ver>         # 仅当前 shell
 sdkz default <c> <ver>     # 全局默认
 sdkz current [c] / home <c> <ver> / env
 sdkz upgrade <c>           # 主版本内升级

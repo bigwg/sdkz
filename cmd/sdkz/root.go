@@ -59,7 +59,6 @@ func init() {
 		newLsCmd(),
 		newInstallCmd(),
 		newUninstallCmd(),
-		newUseCmd(),
 		newDefaultCmd(),
 		newCurrentCmd(),
 		newHomeCmd(),

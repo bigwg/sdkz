@@ -57,14 +57,14 @@ func newInstallCmd() *cobra.Command {
 			rel, err := m.Install(cmd.Context(), candID, spec, vendor, choose, p.OnProgress)
 			if err != nil {
 				if errors.Is(err, installer.ErrAlreadyInstalled) {
-					return fmt.Errorf("%s %s 已安装（可用 sdkz use/default 切换）", candID, rel.Version)
-				}
-				return err
-			}
-			fmt.Fprintf(cmd.OutOrStdout(), "已安装 %s %s\n", candID, rel.Version)
-			fmt.Fprintf(cmd.OutOrStdout(), "使用 sdkz use %s %s 在当前终端生效；sdkz default %s %s 设为全局默认\n",
-				candID, rel.Version, candID, rel.Version)
-			return nil
+					return fmt.Errorf("%s %s 已安装（可用 sdkz default 切换为全局默认）", candID, rel.Version)
+					}
+					return err
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "已安装 %s %s\n", candID, rel.Version)
+					fmt.Fprintf(cmd.OutOrStdout(), "运行 sdkz default %s %s 设为全局默认（Windows 需新开终端生效）\n",
+					candID, rel.Version)
+					return nil
 		},
 	}
 	cmd.Flags().StringVar(&vendor, "vendor", "", "指定发行版（如 tem/zul/graal）")
@@ -111,7 +111,7 @@ func newUpgradeCmd() *cobra.Command {
 
 说明:
   - 若该 SDK 已是最新版本，则提示 "已是最新版本" 不做操作
-  - 安装的新版本不会自动切换 current，需要 "sdkz use/default" 切换
+  - 安装的新版本不会自动切换 current，需要 "sdkz default" 设为全局默认
 
 示例:
   sdkz upgrade go
