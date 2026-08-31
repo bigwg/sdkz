@@ -134,11 +134,23 @@ func TestMavenFetch(t *testing.T) {
 	if len(rels) != 2 {
 		t.Fatalf("应返回 2 个稳定版本（排除 alpha），得到 %d", len(rels))
 	}
-	if rels[0].Artifact.FallbackURLs == nil || len(rels[0].Artifact.FallbackURLs) == 0 {
-		t.Error("应有 archive.apache.org 回退地址")
+	art := rels[0].Artifact
+	// 镜像模式（base 注入）：主地址跟随镜像，归档作为回退。
+	if !strings.HasPrefix(art.URL, srv.URL) {
+		t.Errorf("主地址应走镜像: %s", art.URL)
 	}
-	if rels[0].Artifact.ChecksumType != "sha512" {
-		t.Errorf("checksum 类型应为 sha512: %s", rels[0].Artifact.ChecksumType)
+	if len(art.FallbackURLs) == 0 || !strings.HasPrefix(art.FallbackURLs[0], "https://archive.apache.org/dist/") {
+		t.Errorf("应有 archive.apache.org 回退地址: %v", art.FallbackURLs)
+	}
+	if art.ChecksumType != "sha512" {
+		t.Errorf("checksum 类型应为 sha512: %s", art.ChecksumType)
+	}
+	// 校验值文件应与下载地址同源，并有对应回退。
+	if art.ChecksumURL != art.URL+".sha512" {
+		t.Errorf("ChecksumURL 应为主地址 + .sha512: %s", art.ChecksumURL)
+	}
+	if len(art.FallbackChecksumURLs) != 1 || art.FallbackChecksumURLs[0] != art.FallbackURLs[0]+".sha512" {
+		t.Errorf("校验值回退地址错误: %v", art.FallbackChecksumURLs)
 	}
 }
 

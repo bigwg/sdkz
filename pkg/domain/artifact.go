@@ -12,11 +12,14 @@ type Artifact struct {
 	URL          string   // 主下载地址
 	FallbackURLs []string // 主地址失败时依次尝试
 	ChecksumURL  string   // 校验值文件地址（.sha256/.sha512/SHASUMS256.txt）
-	ChecksumType string   // sha256 | sha512
-	SHA256       string   // 内联校验值（优先于 ChecksumURL）
-	Ext          string   // tar.gz | zip
-	Strip        int      // 解压时剥掉的顶层目录数
-	OriginalHost string   // 原始主机名（镜像替换用，构建时填充）
+	// FallbackChecksumURLs 校验值文件备用地址（ChecksumURL 失败时依次尝试，
+	// 如 dlcdn 在架版 .sha512 → archive 归档版 .sha512）。
+	FallbackChecksumURLs []string
+	ChecksumType         string // sha256 | sha512
+	SHA256               string // 内联校验值（优先于 ChecksumURL）
+	Ext                  string // tar.gz | zip
+	Strip                int    // 解压时剥掉的顶层目录数
+	OriginalHost         string // 原始主机名（镜像替换用，构建时填充）
 }
 
 // ArchiveExt 推断产物扩展名。

@@ -121,9 +121,15 @@ func (i *Installer) Install(ctx context.Context, rel *domain.Release, progress P
 	case art.SHA256 != "":
 		checksum = art.SHA256
 	case art.ChecksumURL != "":
-		sumURL := i.cfg.ApplyMirror(art.ChecksumURL)
+		sumURLs := append([]string{i.cfg.ApplyMirror(art.ChecksumURL)},
+			applyMirrors(i.cfg, art.FallbackChecksumURLs)...)
 		var err error
-		checksum, err = FetchChecksum(ctx, i.client, sumURL, art.ChecksumType)
+		for _, u := range sumURLs {
+			checksum, err = FetchChecksum(ctx, i.client, u, art.ChecksumType)
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
 			i.Warn("获取校验值失败（%v），跳过校验", err)
 			checksum = ""

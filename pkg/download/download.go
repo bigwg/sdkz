@@ -43,6 +43,10 @@ func Download(ctx context.Context, client *http.Client, url, dest string, progre
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		// 404 是确定性失败，重试无意义，直接交给上层尝试 fallback URL。
+		if IsNotFound(lastErr) {
+			return lastErr
+		}
 	}
 	return fmt.Errorf("下载 %s 失败（已重试 %d 次）: %w", url, maxRetries, lastErr)
 }

@@ -126,6 +126,14 @@ sdkz default go 1.23          # 全局默认 Go 1.23
 
 ---
 
+## 历史版本与国内网络
+
+- Maven / Gradle 的**最新版本**从官方 CDN 下载；**历史版本**仅存于 `archive.apache.org`（CDN 发新后即下架旧版，国内镜像亦只同步在架版本）。
+- 若安装历史版本时下载失败，通常是国内网络无法直连 `archive.apache.org`，可配置代理后重试，或改用镜像内在架版本：
+  `sdkz mirror use cn` 后再 `sdkz install maven`（不指定版本即装最新）。
+
+---
+
 ## 目录结构
 
 ```

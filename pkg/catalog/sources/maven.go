@@ -33,48 +33,67 @@ func (s *maven) Name() string { return "Apache Maven" }
 
 var mavenDirRe = regexp.MustCompile(`href="([0-9][0-9.]*)/"`)
 
-// listURL 版本清单地址：未注入自定义 base（镜像/测试假源）时走 Apache 全量归档，
-// 否则跟随 base（镜像内路径结构一致）。
-func (s *maven) listURL() string {
-	if s.base.base != "" {
-		return s.join("/maven/maven-3/")
-	}
-	return mavenListBase
-}
-
 func (s *maven) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Release, error) {
 	ext := "tar.gz"
 	if p.IsWindows() {
 		ext = "zip"
 	}
-	html, err := getText(ctx, s.client, s.listURL(), 1<<20)
+
+	// 清单：默认走 Apache 全量归档；注入自定义 base（镜像/测试）时跟随 base。
+	// 在架清单（dlcdn）拉取失败仅降级为"全部走归档"，不影响版本展示。
+	var listHTML, shelfHTML string
+	var err error
+	if s.base.base != "" {
+		listHTML, err = getText(ctx, s.client, s.join("/maven/maven-3/"), 1<<20)
+	} else {
+		listHTML, err = getText(ctx, s.client, mavenListBase, 1<<20)
+		if err == nil {
+			shelfHTML, _ = getText(ctx, s.client, mavenDefaultBase+"/maven/maven-3/", 1<<20)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("获取 Maven 版本清单失败: %w", err)
 	}
+
+	shelf := map[string]bool{}
+	for _, m := range mavenDirRe.FindAllStringSubmatch(shelfHTML, -1) {
+		shelf[m[1]] = true
+	}
+
 	seen := map[string]bool{}
 	var rels []*domain.Release
-	for _, m := range mavenDirRe.FindAllStringSubmatch(html, -1) {
+	for _, m := range mavenDirRe.FindAllStringSubmatch(listHTML, -1) {
 		v := m[1]
-		if seen[v] {
+		if seen[v] || domain.IsPreReleaseString(v) {
 			continue
 		}
 		seen[v] = true
-		if domain.IsPreReleaseString(v) {
-			continue
+
+		dlcdnURL := fmt.Sprintf("%s/maven/maven-3/%s/binaries/apache-maven-%s-bin.%s", s.join(mavenDefaultBase), v, v, ext)
+		archiveURL := fmt.Sprintf("%s/maven/maven-3/%s/binaries/apache-maven-%s-bin.%s", mavenArchiveBase, v, v, ext)
+
+		art := &domain.Artifact{
+			ChecksumType: "sha512",
+			Ext:          ext,
+			Strip:        1,
 		}
-		main := fmt.Sprintf("%s/maven/maven-3/%s/binaries/apache-maven-%s-bin.%s", s.join(mavenDefaultBase), v, v, ext)
-		fallback := fmt.Sprintf("%s/maven/maven-3/%s/binaries/apache-maven-%s-bin.%s", mavenArchiveBase, v, v, ext)
+		// 在架版本（或镜像模式）：主地址走 dlcdn/镜像（CDN 快），归档兜底；
+		// 已下架版本：仅存在于归档，主地址直接走归档，避免无谓 404。
+		if shelf[v] || s.base.base != "" {
+			art.URL = dlcdnURL
+			art.FallbackURLs = []string{archiveURL}
+		} else {
+			art.URL = archiveURL
+		}
+		art.ChecksumURL = art.URL + ".sha512"
+		if len(art.FallbackURLs) > 0 {
+			art.FallbackChecksumURLs = []string{art.FallbackURLs[0] + ".sha512"}
+		}
+
 		rels = append(rels, &domain.Release{
-			Version: v,
-			Stable:  true,
-			Artifact: &domain.Artifact{
-				URL:          main,
-				FallbackURLs: []string{fallback},
-				ChecksumURL:  main + ".sha512",
-				ChecksumType: "sha512",
-				Ext:          ext,
-				Strip:        1,
-			},
+			Version:  v,
+			Stable:   true,
+			Artifact: art,
 		})
 	}
 	return rels, nil
