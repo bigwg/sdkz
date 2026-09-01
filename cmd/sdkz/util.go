@@ -26,6 +26,7 @@ type progressPrinter struct {
 	mu          sync.Mutex
 	stage       string
 	printed     bool
+	finished    bool // 当前阶段已完成（100% 已换行），忽略后续重复回调
 	tty         bool
 	barWidth    int
 	lastDone    int64
@@ -46,9 +47,15 @@ func (p *progressPrinter) OnProgress(done, total int64, stage string) {
 	if stage != "" && stage != p.stage {
 		p.finishLine()
 		p.stage = stage
+		p.finished = false
 		fmt.Fprintf(os.Stderr, "正在%s…\n", stage)
 		p.lastDone = 0
 		p.lastTime = time.Time{}
+	}
+
+	// 本阶段已渲染完 100% 并换行，忽略后续重复回调（防止画出第二条进度条）。
+	if p.finished {
+		return
 	}
 
 	if done <= 0 || total <= 0 {
@@ -70,6 +77,7 @@ func (p *progressPrinter) OnProgress(done, total int64, stage string) {
 
 	if done >= total {
 		p.finishLine()
+		p.finished = true
 	}
 }
 

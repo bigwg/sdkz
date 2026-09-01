@@ -125,9 +125,8 @@ func downloadOnce(ctx context.Context, client *http.Client, url, part string, pr
 			return rerr
 		}
 	}
-	if progress != nil {
-		progress(done, total)
-	}
+	// 完成进度已在循环内最后一次 n>0 时上报，此处不再重复发送，
+	// 避免上层把同一个 100% 渲染成两条进度条。
 	return nil
 }
 

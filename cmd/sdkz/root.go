@@ -64,8 +64,6 @@ func init() {
 		newHomeCmd(),
 		newEnvCmd(),
 		newMirrorCmd(),
-		newCacheCmd(),
-		newDoctorCmd(),
 		newSelfUpdateCmd(),
 	)
 }

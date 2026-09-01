@@ -1,13 +1,11 @@
-// Package catalog 负责候选元数据：内置定义 + 远程源适配 + 本地缓存 + 离线模式。
+// Package catalog 负责候选元数据：内置定义 + 远程源适配。
 package catalog
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -129,12 +127,6 @@ func (m *Manager) ListRemote(ctx context.Context, cand *domain.Candidate, vendor
 		}
 		rels, err := s.Fetch(ctx, m.Platform())
 		if err != nil {
-			// 网络失败：回退缓存（含离线模式）。
-			if cached, t, ok := m.ReadCache(cand.ID, v.ID); ok && len(cached) > 0 {
-				m.Warn("获取 %s(%s) 最新版本失败（%v），使用本地缓存（%s）", cand.ID, v.Name, err, t.Format("2006-01-02 15:04"))
-				all = append(all, cached...)
-				continue
-			}
 			// 无可用缓存：该发行版暂时不可用，但其余发行版仍应展示。
 			failed = append(failed, v.Name)
 			continue
@@ -144,7 +136,6 @@ func (m *Manager) ListRemote(ctx context.Context, cand *domain.Candidate, vendor
 			r.VendorID = v.ID
 			r.VendorName = v.Name
 		}
-		m.WriteCache(cand.ID, v.ID, rels)
 		all = append(all, rels...)
 	}
 	// 全部发行版均失败才返回错误；部分失败仅告警。
@@ -170,44 +161,4 @@ func selectVendors(cand *domain.Candidate, vendorID string) []*domain.Vendor {
 		vs = append(vs, &cand.Vendors[i])
 	}
 	return vs
-}
-
-// CachePath 返回某候选+发行版的缓存文件路径。
-func (m *Manager) CachePath(candID, vendorID string) string {
-	return filepath.Join(m.cfg.Root, "metadata", fmt.Sprintf("candidates-%s-%s.json", candID, vendorID))
-}
-
-type cacheFile struct {
-	Generated time.Time         `json:"generated"`
-	Platform  string            `json:"platform"`
-	Releases  []*domain.Release `json:"releases"`
-}
-
-// ReadCache 读取本地缓存；返回是否命中。
-func (m *Manager) ReadCache(candID, vendorID string) ([]*domain.Release, time.Time, bool) {
-	data, err := os.ReadFile(m.CachePath(candID, vendorID))
-	if err != nil {
-		return nil, time.Time{}, false
-	}
-	var cf cacheFile
-	if err := json.Unmarshal(data, &cf); err != nil {
-		return nil, time.Time{}, false
-	}
-	if cf.Platform != m.Platform().String() {
-		return nil, time.Time{}, false
-	}
-	return cf.Releases, cf.Generated, true
-}
-
-// WriteCache 写入缓存。
-func (m *Manager) WriteCache(candID, vendorID string, rels []*domain.Release) error {
-	if err := os.MkdirAll(filepath.Join(m.cfg.Root, "metadata"), 0o755); err != nil {
-		return err
-	}
-	cf := cacheFile{Generated: time.Now(), Platform: m.Platform().String(), Releases: rels}
-	data, err := json.MarshalIndent(cf, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(m.CachePath(candID, vendorID), data, 0o644)
 }

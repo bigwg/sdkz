@@ -60,7 +60,7 @@ func TestLoadWithEnvRoot(t *testing.T) {
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	cfg := &Config{Root: root, Offline: true, Mirror: map[string]string{"a.com": "https://b.com"}, Concurrency: 2}
+	cfg := &Config{Root: root, Mirror: map[string]string{"a.com": "https://b.com"}, Concurrency: 2}
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if err := readFileInto(ConfigPath(root), &loaded); err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Offline != true || loaded.Mirror["a.com"] != "https://b.com" {
+	if loaded.Mirror["a.com"] != "https://b.com" {
 		t.Errorf("回读不一致: %+v", loaded)
 	}
 	if loaded.Root != root {

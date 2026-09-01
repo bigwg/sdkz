@@ -18,7 +18,7 @@ import (
 // ErrNeedChoice 表示需要用户在多个发行版中做出选择。
 var ErrNeedChoice = errors.New("需要选择发行版")
 
-// ListRemote 返回候选的可安装版本（已缓存/离线回退）。
+// ListRemote 返回候选的可安装版本（实时拉取远程清单）。
 func (m *Manager) ListRemote(ctx context.Context, candID, vendorID string) ([]*domain.Release, error) {
 	cand, err := m.FindCandidate(candID)
 	if err != nil {
@@ -72,6 +72,21 @@ func (m *Manager) MatchReleases(ctx context.Context, cand *domain.Candidate, spe
 			rels = lts
 		} else {
 			spec = "latest"
+		}
+	}
+
+	// 精确匹配短路：spec 与某版本字符串完全一致时直接返回该版本，
+	// 跳过多发行版选择（完整版本串即安装标识，如 21.0.2-graal）。
+	// 若多个发行版存在完全相同的版本串，则仍走下方的选择流程。
+	if spec != "latest" {
+		var exact []*domain.Release
+		for _, r := range rels {
+			if r.Version == spec {
+				exact = append(exact, r)
+			}
+		}
+		if len(exact) == 1 {
+			return exact, nil
 		}
 	}
 
@@ -277,24 +292,6 @@ func (m *Manager) Init(shell string) (string, error) {
 
 // IsInjected 检查 shell 是否已集成。
 func (m *Manager) IsInjected(shell string) bool { return env.IsInjected(shell) }
-
-// CleanCache 清空元数据缓存。
-func (m *Manager) CleanCache() error {
-	dir := m.cfg.Root + string(os.PathSeparator) + "metadata"
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	for _, e := range entries {
-		if err := os.Remove(dir + string(os.PathSeparator) + e.Name()); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // CleanStale 清理下载/解压临时文件。
 func (m *Manager) CleanStale() {

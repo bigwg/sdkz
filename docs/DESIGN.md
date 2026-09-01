@@ -32,8 +32,6 @@ $SDKZ_DIR                       # 默认 ~/.sdkz，可用环境变量 SDKZ_DIR �
 │       ├── .sdkz-meta.json     # current 指针模式记录
 │       └── current -> 21.0.5-tem  # symlink / junction / 复制目录
 ├── tmp/                        # 下载(.part)与解压暂存（与 candidates 同盘，保证原子 rename）
-├── metadata/
-│   └── candidates-<id>.json    # 各候选版本清单缓存（离线数据源）
 └── config.toml                 # 配置（镜像、自更新仓库等）
 ```
 
@@ -47,7 +45,7 @@ cmd/sdkz/           CLI 入口（cobra），仅做参数解析与格式化
 pkg/domain/         领域模型：Candidate / Vendor / Version / Artifact
 pkg/platform/       GOOS/GOARCH 归一化、归档格式、链接能力探测
 pkg/config/         config.toml + 环境变量覆盖 + 镜像规则
-pkg/catalog/        元数据：内置候选定义 + 远程源适配器 + 缓存 + 离线
+pkg/catalog/        元数据：内置候选定义 + 远程源适配器
   └── sources/      adoptium / zulu / graalvm / golang / nodejs / maven / gradle
 pkg/download/       HTTP 下载（进度、Range 续传、镜像替换、重试）
 pkg/installer/      下载→校验→解压(strip)→原子落盘 / 卸载
@@ -159,8 +157,8 @@ PowerShell 注意：`*>&1` 混流后用 `Invoke-Expression` 处理 export 行（
 - **镜像**：`config.toml` 中 `mirror.<host> = "base-url"`，下载 URL 以 `https://<host>/` 开头时替换前缀。
   `sdkz mirror use cn` 一键写入国内常用镜像（node→npmmirror、go→goproxy.cn、gradle→tuna、
   maven/apache→aliyun 等）。
-- **用户自定义候选**（v1 预留，README 说明）：`$SDKZ_DIR/metadata/extra.toml` 定义静态 release 列表，
-  走 catalog 缓存路径，不编写代码即可加入自定义私有 SDK 源。
+- **用户自定义候选**（v1 预留，README 说明）：定义静态 release 列表注入 catalog 层，
+  不编写代码即可加入自定义私有 SDK 源。
 - **GUI**：新增 `desktop/`（Wails v2）调用 `pkg/service`，进度回调直连前端。
 
 ## 10. 测试与 CI

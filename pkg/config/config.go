@@ -15,7 +15,6 @@ import (
 // Config 是 sdkz 的运行时配置。
 type Config struct {
 	Root           string            `toml:"root"`             // SDKZ 数据目录
-	Offline        bool              `toml:"offline"`          // 离线模式
 	Mirror         map[string]string `toml:"mirror"`           // host → base URL 镜像规则
 	AutoConfirm    bool              `toml:"auto_confirm"`     // 免交互确认
 	SelfUpdateRepo string            `toml:"self_update_repo"` // owner/repo，用于 selfupdate

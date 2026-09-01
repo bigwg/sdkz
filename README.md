@@ -52,7 +52,7 @@
 - **跨平台一致**：Linux / macOS / Windows，命令、配置、行为三端对齐（Windows 免管理员）
 - **Java 多发行版**：Temurin / Azul Zulu / GraalVM / Tencent Kona / Alibaba Dragonwell / SAP Machine，可指定 `--vendor`
 - **持久生效**：`default` 设置全局默认版本，跨终端、跨 shell 一致生效
-- **离线可用**：元数据本地缓存 + 国内镜像加速
+- **国内镜像**：一键切换 npmmirror / goproxy.cn 等国内镜像加速下载
 - **安全可靠**：sha256 校验 + 原子安装 + current 指针自动降级（symlink → junction → copy）
 - **单文件二进制**：Go 实现，无运行时依赖，开箱即用
 
@@ -113,7 +113,7 @@ sdkz uninstall <c> <ver>
 sdkz default <c> <ver>     # 全局默认
 sdkz current [c] / home <c> <ver> / env
 sdkz mirror add|list|use cn
-sdkz cache clean / doctor / selfupdate / version
+sdkz selfupdate / version
 ```
 
 示例：
@@ -140,7 +140,7 @@ sdkz default go 1.23          # 全局默认 Go 1.23
 ~/.sdkz/                       # 可用 SDKZ_DIR 环境变量覆盖
 ├── candidates/<c>/<ver>/      # 已安装版本
 ├── candidates/<c>/current     # 当前版本指针
-├── tmp/  metadata/  config.toml
+├── tmp/  config.toml
 ```
 
 ---

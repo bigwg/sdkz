@@ -20,13 +20,13 @@ cmd/sdkz/         # CLI 入口（cobra 命令定义）
   ├─ install_cmds.go  # install / uninstall
   ├─ switch_cmds.go   # default / current
   ├─ config_cmds.go   # 配置、镜像
-  └─ misc_cmds.go     # init / selfupdate / doctor 等
+  └─ misc_cmds.go     # init / selfupdate 等
 pkg/
   ├─ domain/      # 核心领域模型（Release、Candidate、版本解析与排序）
   ├─ catalog/     # 候选源适配与版本聚合
   │   ├─ sources/     # 各 SDK 数据源（nodejs.go、adoptium.go、github.go 等）
   │   └─ builtin.go   # 内置候选与厂商定义
-  ├─ service/     # 业务逻辑（Manager：安装、切换、缓存、元数据）
+  ├─ service/     # 业务逻辑（Manager：安装、切换、元数据）
   ├─ platform/    # 平台探测（OS / Arch / shell 检测）
   └─ version/     # 版本号注入（编译期 -ldflags）
 scripts/          # install.sh / install.ps1 安装脚本
