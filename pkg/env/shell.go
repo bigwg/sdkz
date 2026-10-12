@@ -3,6 +3,7 @@ package env
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -67,20 +68,27 @@ const (
 )
 
 // InitSnippet 返回指定 shell 的初始化块。
-func InitSnippet(shell string) string {
+// installDir 为 sdkz 可执行文件所在目录，会被一并加入 PATH，
+// 否则在某些 shell（如 Ubuntu 下的 zsh 不读取 ~/.profile）中找不到 sdkz 命令。
+func InitSnippet(shell, installDir string) string {
 	switch shell {
 	case "fish":
-		return fishSnippet()
+		return fishSnippet(installDir)
 	case "pwsh":
-		return pwshSnippet()
+		return pwshSnippet(installDir)
 	default: // bash / zsh
-		return bashSnippet()
+		return bashSnippet(installDir)
 	}
 }
 
-func bashSnippet() string {
+func bashSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 export SDKZ_DIR="${SDKZ_DIR:-$HOME/.sdkz}"
+# 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
+case ":$PATH:" in
+  *":` + installDir + `:"*) ;;
+  *) export PATH="` + installDir + `:$PATH" ;;
+esac
 for c in java go node maven gradle; do
   d="$SDKZ_DIR/candidates/$c/current"
   if [ -d "$d/bin" ]; then
@@ -105,9 +113,13 @@ sdkz() {
 # <<< sdkz initialize <<<`
 }
 
-func fishSnippet() string {
+func fishSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 set -gx SDKZ_DIR "$HOME/.sdkz"
+# 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
+if not contains -- "` + installDir + `" $PATH
+  set -gx PATH "` + installDir + `" $PATH
+end
 for c in java go node maven gradle
   set -l d "$SDKZ_DIR/candidates/$c/current"
   if test -d "$d/bin"
@@ -138,9 +150,11 @@ end
 # <<< sdkz initialize <<<`
 }
 
-func pwshSnippet() string {
+func pwshSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 $env:SDKZ_DIR = if ($env:SDKZ_DIR) { $env:SDKZ_DIR } else { Join-Path $HOME ".sdkz" }
+# 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
+if ($env:PATH -notlike "*` + installDir + `*") { $env:PATH = "` + installDir + `;$env:PATH" }
 foreach ($c in @("java","go","node","maven","gradle")) {
   $d = Join-Path $env:SDKZ_DIR "candidates\$c\current"
   if (Test-Path (Join-Path $d "bin")) {
@@ -173,16 +187,35 @@ function global:sdkz {
 # <<< sdkz initialize <<<`
 }
 
+// InstallDir 返回 sdkz 可执行文件所在目录。
+// 优先使用 os.Executable()（指向正在运行的 sdkz 二进制），
+// 失败时回退到 PATH 中首个名为 sdkz 的命令所在目录，再回退默认安装目录。
+func InstallDir() string {
+	if exe, err := os.Executable(); err == nil {
+		if dir := filepath.Dir(exe); dir != "" && dir != "." {
+			return dir
+		}
+	}
+	if p, err := exec.LookPath("sdkz"); err == nil {
+		return filepath.Dir(p)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".local", "bin")
+	}
+	return filepath.Join("$HOME", ".local", "bin")
+}
+
 // Inject 幂等地将初始化块写入 shell 配置文件。
 // 会先移除文件中所有已存在的 sdkz 初始化块（无论数量、是否损坏/粘连），
 // 再在末尾追加一份当前版本，因此重复执行 init 不会产生重复或叠加乱码块。
+// installDir 为 sdkz 可执行文件所在目录，会被加入 PATH。
 // 返回写入的文件路径。
-func Inject(shell string) (string, error) {
+func Inject(shell, installDir string) (string, error) {
 	rc := RCPath(shell)
 	if rc == "" {
 		return "", fmt.Errorf("不支持的 shell: %s", shell)
 	}
-	snippet := InitSnippet(shell)
+	snippet := InitSnippet(shell, installDir)
 	content := ""
 	if data, err := os.ReadFile(rc); err == nil {
 		content = string(data)

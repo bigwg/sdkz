@@ -29,7 +29,7 @@ func TestRemoveAllBlocksConvergesToOne(t *testing.T) {
 
 // 验证 Inject 的内部逻辑（removeAllBlocks + 追加一份）连续两次收敛为恰好一份。
 func TestInjectConvergesToSingleBlock(t *testing.T) {
-	snippet := pwshSnippet()
+	snippet := pwshSnippet("/home/user/.local/bin")
 	// 第一次：损坏内容 -> 删所有 + 追加一份。
 	step1 := removeAllBlocks(damaged) + "\n" + snippet + "\n"
 	if c := strings.Count(step1, markerBegin); c != 1 {

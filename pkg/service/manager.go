@@ -286,8 +286,9 @@ func (m *Manager) Which(candID string) (string, error) {
 }
 
 // Init 注入 shell 集成，返回配置文件路径。
+// 注入的初始化块会把 sdkz 可执行文件所在目录加入 PATH，避免命令找不到。
 func (m *Manager) Init(shell string) (string, error) {
-	return env.Inject(shell)
+	return env.Inject(shell, env.InstallDir())
 }
 
 // IsInjected 检查 shell 是否已集成。

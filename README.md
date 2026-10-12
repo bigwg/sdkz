@@ -19,7 +19,7 @@
 
 | 语言 | 常见版本管理器 |
 |------|---------------|
-| Java | SDKMAN!、jenv |
+| Java | jenv、jabba |
 | Go   | gvm、手动切换 |
 | Node | nvm、fnm、n |
 | Ruby | rbenv、rvm |
@@ -104,24 +104,40 @@ sdkz default node 20        # 全局默认 Node.js 20
 
 ## 命令一览
 
+`<c>` 为候选名（java/go/node/maven/gradle），`<ver>` 为版本规格。
+
 ```
-sdkz init [shell]          # shell 集成（写入 rc/profile，让 PATH 与 *_HOME 生效）
-sdkz list [candidate]      # 可安装版本
-sdkz ls [candidate]        # 已安装版本
+sdkz init [shell]                  # 注入 shell 集成（写入 rc/profile，使 PATH 与 *_HOME 生效）
+sdkz list [c] [--vendor v]         # 列出可安装的远程版本（实时联网拉取）
+sdkz ls [c]                        # 列出本地已安装的版本
 sdkz install <c> [ver] [--vendor v]
-sdkz uninstall <c> <ver>
-sdkz default <c> <ver>     # 全局默认
-sdkz current [c] / home <c> <ver> / env
-sdkz mirror add|list|use cn
-sdkz selfupdate / version
+                                   # 安装版本；ver 支持 latest / lts / 主版本号（21）/
+                                   # 完整版本串（21.0.2-graal，精确匹配直接安装）
+sdkz uninstall <c> <ver>           # 卸载指定版本
+sdkz default <c> <ver>             # 设为全局默认（持久生效；Windows 同步写用户级环境变量）
+sdkz current [c]                   # 查看当前使用的版本（current 指针）
+sdkz home <c> [ver]                # 显示某版本的安装目录
+sdkz env                           # 输出环境变量导出语句（可 eval 注入当前终端）
+sdkz mirror use cn                 # 一键启用国内镜像（npmmirror/goproxy.cn/tuna/aliyun 等）
+sdkz mirror add <key> <url> | list | clear
+                                   # 手动添加 / 查看 / 清空镜像规则
+sdkz selfupdate                    # 从 GitHub Releases 升级自身（sha256 校验 + 原子替换）
+sdkz version                       # 显示版本信息
 ```
+
+说明：
+
+- 多发行版候选（如 java）不指定 `--vendor` 时，模糊版本规格（如 `21`）若命中多个发行版，
+  会列出候选菜单供选择；**输入完整版本串可跳过选择直接安装**。
+- `default` 更新 `current` 指针；已 `sdkz init` 的终端可用 `env` 输出立即生效，否则重开终端。
 
 示例：
 
 ```bash
-sdkz list java --vendor zul   # 只看 Azul Zulu 的 Java 版本
-sdkz install node lts         # 安装 Node.js 最新 LTS
-sdkz default go 1.23          # 全局默认 Go 1.23
+sdkz list java --vendor zul     # 只看 Azul Zulu 的 Java 版本
+sdkz install node lts           # 安装 Node.js 最新 LTS
+sdkz install java 21.0.2-graal  # 完整版本串精确安装 GraalVM，跳过多发行版选择
+sdkz default go 1.23            # 全局默认 Go 1.23
 ```
 
 ---

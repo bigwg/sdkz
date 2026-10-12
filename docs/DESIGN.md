@@ -1,6 +1,6 @@
 # sdkz — 设计文档
 
-> 跨平台的 SDK 版本管理工具（Go 实现，对标 SDKMAN）。
+> 跨平台的 SDK 版本管理工具（Go 实现）。
 > v1 为纯 CLI；v2 通过 Wails v2 提供 GUI。GUI 与 CLI 共用同一核心用例层。
 
 ## 1. 设计目标与非目标
