@@ -89,6 +89,27 @@ func JavaMajors(ctx context.Context, client *http.Client) []int {
 	return info.AvailableReleases
 }
 
+// JavaMajorsCache 在一次运行内共享 Java 主版本列表。
+// temurin 与 zulu 都依赖同一份主版本列表，经此缓存后整个进程只请求一次
+// Adoptium 的 available_releases 接口（并发调用由 sync.Once 去重）。
+// 零值/nil 缓存退化为直接拉取，便于测试按源注入各自的假服务。
+type JavaMajorsCache struct {
+	once sync.Once
+	val  []int
+}
+
+// NewJavaMajorsCache 构造共享缓存实例。
+func NewJavaMajorsCache() *JavaMajorsCache { return &JavaMajorsCache{} }
+
+// Majors 返回共享的主版本列表；c 为 nil 时直接拉取不缓存。
+func (c *JavaMajorsCache) Majors(ctx context.Context, client *http.Client) []int {
+	if c == nil {
+		return JavaMajors(ctx, client)
+	}
+	c.once.Do(func() { c.val = JavaMajors(ctx, client) })
+	return c.val
+}
+
 // httpClientWithTimeout 返回带超时的客户端（用于独立小请求）。
 func httpClientWithTimeout() *http.Client {
 	return &http.Client{Timeout: 30 * time.Second}

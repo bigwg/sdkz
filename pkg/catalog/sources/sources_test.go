@@ -94,7 +94,7 @@ func TestAdoptiumFetch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := NewAdoptium(&http.Client{})
+	s := NewAdoptium(&http.Client{}, nil)
 	s.SetBaseURL(srv.URL)
 	rels, err := s.Fetch(context.Background(), testPlatform())
 	if err != nil {

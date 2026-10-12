@@ -16,11 +16,12 @@ const zuluDefaultBase = "https://api.azul.com"
 type zulu struct {
 	base
 	client *http.Client
+	majors *JavaMajorsCache
 }
 
-// NewZulu 构造 Azul Zulu 源适配器。
-func NewZulu(client *http.Client) *zulu {
-	return &zulu{base: base{base: zuluDefaultBase}, client: client}
+// NewZulu 构造 Azul Zulu 源适配器。majors 可为 nil（退化为独立拉取）。
+func NewZulu(client *http.Client, majors *JavaMajorsCache) *zulu {
+	return &zulu{base: base{base: zuluDefaultBase}, client: client, majors: majors}
 }
 
 func (s *zulu) ID() string   { return "zulu" }
@@ -45,10 +46,10 @@ func (s *zulu) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Releas
 		archiveType = "zip"
 	}
 
-	majors := JavaMajors(ctx, s.client)
+	majors := s.majors.Majors(ctx, s.client)
 	var mu sync.Mutex
 	var rels []*domain.Release
-	err := parallelFetch(ctx, majors, 4, func(major int) error {
+	err := parallelFetch(ctx, majors, 8, func(major int) error {
 		url := fmt.Sprintf(
 			"%s/metadata/v1/zulu/packages/?java_version=%d&os=%s&arch=%s&archive_type=%s&java_package_type=jdk&javafx_bundled=false&crac_supported=false&release_status=ga&latest=true&availability_types=CA",
 			s.join(""), major, osName, arch, archiveType)

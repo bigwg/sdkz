@@ -42,7 +42,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 echo "下载 $URL"
 if command -v curl >/dev/null 2>&1; then
-  curl -fSL "$URL" -o "$TMP/$ASSET" || err "下载失败（请确认已发布 release: https://github.com/${REPO}/releases）"
+  curl -fSL --progress-bar "$URL" -o "$TMP/$ASSET" || err "下载失败（请确认已发布 release: https://github.com/${REPO}/releases）"
 elif command -v wget >/dev/null 2>&1; then
   wget -O "$TMP/$ASSET" "$URL" || err "下载失败"
 else
@@ -68,13 +68,20 @@ fi
 install -m 0755 "$NEW" "$INSTALL_DIR/$BINARY" || err "安装失败"
 echo "已安装到 $INSTALL_DIR/$BINARY"
 
-# 5. PATH 检查
+# 5. PATH 检查（init 会把安装目录写入 shell 配置，新终端自动生效）
+in_path=1
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) : ;;
-  *) echo "提示: 请将 $INSTALL_DIR 加入 PATH（如 export PATH=\"$INSTALL_DIR:\$PATH\"）" ;;
+  *) in_path=0 ;;
 esac
 
-# 6. shell 集成
-"$INSTALL_DIR/$BINARY" init >/dev/null 2>&1 || true
+# 6. shell 集成（init 输出首行格式为 "已写入 <rc路径>"）
+INIT_RC="$("$INSTALL_DIR/$BINARY" init 2>/dev/null | sed -n 's/^已写入 //p')" || true
 
 echo "完成！运行 'sdkz list java' 开始使用（已安装版本升级用 'sdkz selfupdate'）。"
+if [ -n "$INIT_RC" ]; then
+  echo "shell 集成已写入 $INIT_RC，重新打开终端生效；当前会话可执行: source $INIT_RC"
+fi
+if [ "$in_path" -eq 0 ]; then
+  echo "提示: 若之后仍提示找不到 sdkz，可手动将安装目录加入 PATH: export PATH=\"$INSTALL_DIR:\$PATH\""
+fi

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"sdkz/pkg/catalog/sources"
@@ -63,8 +64,10 @@ func NewManager(cfg *config.Config) *Manager {
 		baseURLs: make(map[string]string),
 		Warn:     func(string, ...any) {},
 	}
-	m.register(sources.NewAdoptium(m.client))
-	m.register(sources.NewZulu(m.client))
+	// temurin 与 zulu 共享同一份 Java 主版本列表（一次请求，进程内去重）。
+	javaMajors := sources.NewJavaMajorsCache()
+	m.register(sources.NewAdoptium(m.client, javaMajors))
+	m.register(sources.NewZulu(m.client, javaMajors))
 	m.register(sources.NewGraalVM(m.client))
 	m.register(sources.NewGolang(m.client))
 	m.register(sources.NewNodeJS(m.client))
@@ -111,32 +114,82 @@ func FindCandidate(id string) (*domain.Candidate, bool) {
 	return nil, false
 }
 
-// ListRemote 拉取（或从缓存读取）候选的全部版本清单。
-// vendorID 为空时拉取全部发行版。
+// ListRemote 拉取候选的全部版本清单。
+// vendorID 为空时拉取全部发行版；各发行版并发拉取（耗时取决于最慢的单个源，
+// 而非各源之和），结果按内置厂商顺序拼接以保持展示稳定。
 func (m *Manager) ListRemote(ctx context.Context, cand *domain.Candidate, vendorID string) ([]*domain.Release, error) {
 	vendors := selectVendors(cand, vendorID)
 	if len(vendors) == 0 {
 		return nil, fmt.Errorf("未知发行版: %s", vendorID)
 	}
-	var all []*domain.Release
-	var failed []string
-	for _, v := range vendors {
+	srcs := make([]Source, len(vendors))
+	for i, v := range vendors {
 		s, ok := m.sources[v.SourceID]
 		if !ok {
 			return nil, fmt.Errorf("候选 %s 的源 %q 未注册", cand.ID, v.SourceID)
 		}
-		rels, err := s.Fetch(ctx, m.Platform())
-		if err != nil {
+		srcs[i] = s
+	}
+	p := m.Platform()
+	perVendor := make([][]*domain.Release, len(vendors))
+	errs := make([]error, len(vendors))
+	limit := len(vendors)
+	if limit > 6 {
+		limit = 6
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i := range vendors {
+		select {
+		case sem <- struct{}{}:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			v := vendors[i]
+			annotate := func(rels []*domain.Release) {
+				for _, r := range rels {
+					r.CandidateID = cand.ID
+					r.VendorID = v.ID
+					r.VendorName = v.Name
+				}
+			}
+			// 新鲜缓存（TTL 内）：直接返回，不产生网络请求（规避 GitHub 匿名限流）。
+			if cached, gen, ok := m.readCache(cand.ID, v.ID); ok && time.Since(gen) < MetadataTTL {
+				annotate(cached)
+				perVendor[i] = cached
+				return
+			}
+			rels, err := srcs[i].Fetch(ctx, p)
+			if err != nil {
+				// 网络失败（如 GitHub 403 限流）：回退本地旧缓存，保证版本仍可用。
+				if cached, gen, ok := m.readCache(cand.ID, v.ID); ok {
+					m.Warn("获取 %s(%s) 失败（%v），使用本地缓存（%s 生成）", cand.ID, v.Name, err, gen.Format("2006-01-02 15:04"))
+					annotate(cached)
+					perVendor[i] = cached
+					return
+				}
+				errs[i] = err
+				return
+			}
+			annotate(rels)
+			m.writeCache(cand.ID, v.ID, rels)
+			perVendor[i] = rels
+		}(i)
+	}
+	wg.Wait()
+	var all []*domain.Release
+	var failed []string
+	for i := range vendors {
+		if errs[i] != nil {
 			// 无可用缓存：该发行版暂时不可用，但其余发行版仍应展示。
-			failed = append(failed, v.Name)
+			failed = append(failed, vendors[i].Name)
 			continue
 		}
-		for _, r := range rels {
-			r.CandidateID = cand.ID
-			r.VendorID = v.ID
-			r.VendorName = v.Name
-		}
-		all = append(all, rels...)
+		all = append(all, perVendor[i]...)
 	}
 	// 全部发行版均失败才返回错误；部分失败仅告警。
 	if len(all) == 0 && len(failed) > 0 {

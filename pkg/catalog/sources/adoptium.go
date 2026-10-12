@@ -17,11 +17,12 @@ const adoptiumDefaultBase = "https://api.adoptium.net"
 type adoptium struct {
 	base
 	client *http.Client
+	majors *JavaMajorsCache
 }
 
-// NewAdoptium 构造 Eclipse Temurin 源适配器。
-func NewAdoptium(client *http.Client) *adoptium {
-	return &adoptium{base: base{base: adoptiumDefaultBase}, client: client}
+// NewAdoptium 构造 Eclipse Temurin 源适配器。majors 可为 nil（退化为独立拉取）。
+func NewAdoptium(client *http.Client, majors *JavaMajorsCache) *adoptium {
+	return &adoptium{base: base{base: adoptiumDefaultBase}, client: client, majors: majors}
 }
 
 func (s *adoptium) ID() string   { return "temurin" }
@@ -55,11 +56,11 @@ func (s *adoptium) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Re
 	}
 	osName = strings.ToLower(osName)
 
-	majors := JavaMajors(ctx, s.client)
+	majors := s.majors.Majors(ctx, s.client)
 	var mu sync.Mutex
 	var rels []*domain.Release
 	var failed int32
-	err := parallelFetch(ctx, majors, 4, func(major int) error {
+	err := parallelFetch(ctx, majors, 8, func(major int) error {
 		url := fmt.Sprintf("%s/v3/assets/latest/%d/hotspot?architecture=%s&image_type=jdk&jvm_impl=hotspot&os=%s&vendor=eclipse&release_type=ga",
 			s.join(""), major, arch, osName)
 		var assets []adoptiumAsset
