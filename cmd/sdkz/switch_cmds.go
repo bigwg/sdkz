@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 
 	"github.com/spf13/cobra"
+
+	"sdkz/pkg/env"
 )
 
 // newDefaultCmd 生成 default 命令。
@@ -20,7 +23,8 @@ func newDefaultCmd() *cobra.Command {
 平台行为:
   - Windows: 自动写入用户级环境变量（JAVA_HOME / PATH 等），PowerShell / CMD / Git Bash
     无需 sdkz init 即可生效；已打开的终端需新开后才能看到变更（Windows 机制限制）。
-  - Linux / macOS: 更新 current 软链；已 sdkz init 的 shell 即时生效，否则新终端生效。
+  - Linux / macOS: 更新 current 软链；经 sdkz shell 集成（sdkz() 包装函数）调用时
+    当前会话即时生效，直接调用二进制或未 init 时需 source rc 文件或新开终端。
 
 参数:
   candidate  必填，支持的 SDK: java, go, node, maven, gradle
@@ -43,8 +47,13 @@ func newDefaultCmd() *cobra.Command {
 			fmt.Fprintf(stderr(), "已将 %s 默认版本设为 %s\n", args[0], args[1])
 			if runtime.GOOS == "windows" {
 				fmt.Fprintln(stderr(), "Windows: 已写入用户级环境变量，请新开终端后生效（当前窗口可执行上面输出的导出语句立即生效）。")
+			} else if os.Getenv("SDKZ_SHELL_INTEGRATION") == "1" {
+				// init 片段设置的标记：本次调用经由 sdkz() 包装函数，导出块已在当前会话 eval。
+				fmt.Fprintln(stderr(), "当前会话已即时生效。")
 			} else {
-				fmt.Fprintln(stderr(), "新开终端或运行 'source <(~/.sdkz ...)' 后生效；已 init 的 shell 当前会话即时生效。")
+				rc := env.RCPath(env.DetectShellOr("bash"))
+				fmt.Fprintf(stderr(), "当前会话未即时生效（未检测到 sdkz shell 集成），运行 'source %s' 或重开终端后生效。\n", rc)
+				fmt.Fprintln(stderr(), "如已 init 仍提示此信息，请重新运行 'sdkz init' 更新集成脚本。")
 			}
 			return nil
 		},

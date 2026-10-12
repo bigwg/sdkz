@@ -164,6 +164,11 @@ func (m *Manager) ListRemote(ctx context.Context, cand *domain.Candidate, vendor
 				return
 			}
 			rels, err := srcs[i].Fetch(ctx, p)
+			// 请求"成功"但 0 个版本：视为异常（资产命名变化/平台无资产），
+			// 不写缓存以免污染，并走失败回退链（存在旧缓存则回退）。
+			if err == nil && len(rels) == 0 {
+				err = fmt.Errorf("%s(%s) 未解析到任何版本（资产命名可能已变化）", cand.ID, v.Name)
+			}
 			if err != nil {
 				// 网络失败（如 GitHub 403 限流）：回退本地旧缓存，保证版本仍可用。
 				if cached, gen, ok := m.readCache(cand.ID, v.ID); ok {

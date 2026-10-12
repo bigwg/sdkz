@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	verbose bool
-	_mgr    *service.Manager
-	_mgrErr error
+	verbose  bool
+	_mgr     *service.Manager
+	_mgrErr  error
 	_mgrOnce sync.Once
 )
 

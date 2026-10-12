@@ -92,30 +92,37 @@ func (s *ghReleaseSource) Fetch(ctx context.Context, p platform.Platform) ([]*do
 
 // ---- 平台/资产名匹配辅助 ----
 
-// ghOSMap / ghArchMap 将本程序平台映射到 GitHub 资产命名惯例。
+// ghOSMap / ghArchMap / ghArchAliases 将本程序平台映射到 GitHub 资产命名惯例。
+// ghArchMap 为各厂商最通用的首选写法；ghArchAliases 是 matchPlatform 逐一尝试的别名集合。
 var (
-	ghOSMap   = map[string]string{"linux": "linux", "darwin": "macos", "windows": "windows"}
-	ghArchMap = map[string]string{"amd64": "x64", "arm64": "aarch64"}
+	ghOSMap       = map[string]string{"linux": "linux", "darwin": "macos", "windows": "windows"}
+	ghArchMap     = map[string]string{"amd64": "x64", "arm64": "aarch64"}
+	ghArchAliases = map[string][]string{
+		"amd64": {"x64", "x86_64", "amd64"},
+		"arm64": {"aarch64", "arm64"},
+	}
 )
 
 // matchPlatform 检查资产名中是否包含 <os>_<arch> 或 <os>-<arch> 平台段（兼容多种分隔）。
 func matchPlatform(name string, p platform.Platform) bool {
 	targetOS := ghOSMap[p.OS]
-	targetArch := ghArchMap[p.Arch]
-	if targetOS == "" || targetArch == "" {
+	aliases := ghArchAliases[p.Arch]
+	if targetOS == "" || len(aliases) == 0 {
 		return false
 	}
 	n := strings.ToLower(name)
-	// 常见形式：linux-x64 / linux_x64 / x64_linux / aarch64_linux
-	candidates := []string{
-		targetOS + "-" + targetArch,
-		targetOS + "_" + targetArch,
-		targetArch + "_" + targetOS,
-		targetArch + "-" + targetOS,
-	}
-	for _, c := range candidates {
-		if strings.Contains(n, c) {
-			return true
+	// 常见形式：linux-x64 / linux_x64 / linux-x86_64 / x64_linux / aarch64_linux。
+	for _, targetArch := range aliases {
+		candidates := []string{
+			targetOS + "-" + targetArch,
+			targetOS + "_" + targetArch,
+			targetArch + "_" + targetOS,
+			targetArch + "-" + targetOS,
+		}
+		for _, c := range candidates {
+			if strings.Contains(n, c) {
+				return true
+			}
 		}
 	}
 	return false

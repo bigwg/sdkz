@@ -13,6 +13,32 @@ import (
 
 func testPlatform() platform.Platform { return platform.FromParts("linux", "amd64") }
 
+// parseKona 兼容 linux-x86_64 命名（Tencent 官方 Linux 资产不用 x64）。
+func TestParseKonaX86_64(t *testing.T) {
+	p := platform.Platform{OS: "linux", Arch: "amd64"}
+	ver, ok := parseKona("TencentKona-21.0.12.b1-jdk_linux-x86_64.tar.gz", p)
+	if !ok || ver != "21.0.12" {
+		t.Fatalf("linux-x86_64 解析失败: ver=%q ok=%v", ver, ok)
+	}
+	ver, ok = parseKona("TencentKona8.0.27.b1_qdk_linux-x86_64_8u502.tar.gz", p)
+	if !ok || ver != "8.0.27" {
+		t.Fatalf("Kona8 linux-x86_64 解析失败: ver=%q ok=%v", ver, ok)
+	}
+	// 原 x64 命名与其他平台回归。
+	ver, ok = parseKona("TencentKona-11.0.32.b1-jdk_linux-x64.tar.gz", p)
+	if !ok || ver != "11.0.32" {
+		t.Fatalf("linux-x64 回归失败: ver=%q ok=%v", ver, ok)
+	}
+	ver, ok = parseKona("TencentKona-21.0.12.b1-jdk_linux-aarch64.tar.gz", platform.Platform{OS: "linux", Arch: "arm64"})
+	if !ok || ver != "21.0.12" {
+		t.Fatalf("linux-aarch64 回归失败: ver=%q ok=%v", ver, ok)
+	}
+	// 其他平台的资产不应匹配。
+	if _, ok := parseKona("TencentKona-21.0.12.b1_jdk_windows-x86_64_signed.zip", p); ok {
+		t.Fatal("windows 资产不应匹配 linux/amd64")
+	}
+}
+
 func TestGolangFetch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`[

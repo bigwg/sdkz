@@ -45,8 +45,28 @@ func TestInjectConvergesToSingleBlock(t *testing.T) {
 	}
 }
 
-func TestRemoveAllBlocksHalfBlock(t *testing.T) {
-	// 真实场景：sdkz 块总是追加到文件末尾，半块（无 end）出现在末尾，用户内容在前。
+// 验证 bash/zsh 包装函数的 eval 写法：必须是 eval "$(...)" 在当前 shell 执行；
+// 管道写法（tail | eval）会使 eval 落在子 shell 中，export 全部丢失（历史 bug）。
+func TestBashSnippetEvalInCurrentShell(t *testing.T) {
+	s := InitSnippet("bash", "/home/u/.local/bin")
+	if !strings.Contains(s, `eval "$(printf`) {
+		t.Fatalf("bash 片段应使用 eval \"$(...)\" 在当前 shell 执行:\n%s", s)
+	}
+	if strings.Contains(s, "| eval") {
+		t.Fatalf("bash 片段不得使用管道 eval（子 shell 中 export 会丢失）:\n%s", s)
+	}
+	if !strings.Contains(s, "SDKZ_SHELL_INTEGRATION") {
+		t.Fatalf("bash 片段应注入集成标记环境变量:\n%s", s)
+	}
+	if f := InitSnippet("fish", "/home/u/.local/bin"); !strings.Contains(f, "SDKZ_SHELL_INTEGRATION") {
+		t.Fatalf("fish 片段应注入集成标记环境变量:\n%s", f)
+	}
+	if w := InitSnippet("pwsh", "/home/u/.local/bin"); !strings.Contains(w, "SDKZ_SHELL_INTEGRATION") {
+		t.Fatalf("pwsh 片段应注入集成标记环境变量:\n%s", w)
+	}
+}
+
+func TestRemoveAllBlocksHalfBlock(t *testing.T) { // 真实场景：sdkz 块总是追加到文件末尾，半块（无 end）出现在末尾，用户内容在前。
 	half := "before user content\n# >>> sdkz initialize >>>\norphan content without end\n"
 	clean := removeAllBlocks(half)
 	if strings.Contains(clean, markerBegin) || strings.Contains(clean, "orphan content") {

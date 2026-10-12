@@ -84,6 +84,7 @@ func InitSnippet(shell, installDir string) string {
 func bashSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 export SDKZ_DIR="${SDKZ_DIR:-$HOME/.sdkz}"
+export SDKZ_SHELL_INTEGRATION=1
 # 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
 case ":$PATH:" in
   *":` + installDir + `:"*) ;;
@@ -105,7 +106,11 @@ sdkz() {
   local out
   if out="$(command sdkz "$@")"; then
     case "$out" in
-      '# SDKZ_EXPORT'*) printf '%s\n' "$out" | tail -n +2 | eval ;;
+      '# SDKZ_EXPORT'*)
+        # 必须以 eval "$(...)" 在当前 shell 执行导出；
+        # 不能通过管道送给 eval——管道会使 eval 落在子 shell 中，export 全部丢失。
+        eval "$(printf '%s\n' "$out" | tail -n +2)"
+        ;;
       *) printf '%s\n' "$out" ;;
     esac
   fi
@@ -116,6 +121,7 @@ sdkz() {
 func fishSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 set -gx SDKZ_DIR "$HOME/.sdkz"
+set -gx SDKZ_SHELL_INTEGRATION 1
 # 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
 if not contains -- "` + installDir + `" $PATH
   set -gx PATH "` + installDir + `" $PATH
@@ -153,6 +159,7 @@ end
 func pwshSnippet(installDir string) string {
 	return `# >>> sdkz initialize >>>
 $env:SDKZ_DIR = if ($env:SDKZ_DIR) { $env:SDKZ_DIR } else { Join-Path $HOME ".sdkz" }
+$env:SDKZ_SHELL_INTEGRATION = "1"
 # 将 sdkz 可执行文件所在目录加入 PATH（避免命令找不到）
 if ($env:PATH -notlike "*` + installDir + `*") { $env:PATH = "` + installDir + `;$env:PATH" }
 foreach ($c in @("java","go","node","maven","gradle")) {

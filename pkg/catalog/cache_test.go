@@ -134,6 +134,52 @@ func TestListRemoteStaleCacheFallback(t *testing.T) {
 	}
 }
 
+// 源"成功"但返回空列表：视为异常，不写缓存；有旧缓存时回退旧缓存。
+func TestListRemoteEmptyResultTreatedAsFailure(t *testing.T) {
+	rels := []*domain.Release{{Version: "1.0.0", Stable: true}}
+	src := &fakeSrc{rels: rels}
+	var warns []string
+	m := newCacheTestManager(t, src, &warns)
+	cand := cacheTestCandidate()
+
+	if _, err := m.ListRemote(context.Background(), cand, ""); err != nil {
+		t.Fatalf("首次拉取失败: %v", err)
+	}
+	// 缓存过期后，源返回空列表（模拟资产命名变化）。
+	path := m.CachePath("test", "v")
+	data, _ := os.ReadFile(path)
+	var cf cacheFile
+	if err := json.Unmarshal(data, &cf); err != nil {
+		t.Fatal(err)
+	}
+	cf.Generated = time.Now().Add(-2 * MetadataTTL)
+	stale, _ := json.Marshal(cf)
+	if err := os.WriteFile(path, stale, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	src.rels = nil
+
+	got, err := m.ListRemote(context.Background(), cand, "")
+	if err != nil {
+		t.Fatalf("空结果应回退旧缓存而非报错: %v", err)
+	}
+	if len(got) != 1 || got[0].Version != "1.0.0" {
+		t.Fatalf("回退内容不符: %+v", got)
+	}
+	if len(warns) != 1 || !strings.Contains(warns[0], "未解析到任何版本") {
+		t.Fatalf("应产生空结果告警: %v", warns)
+	}
+	// 空结果不得覆盖旧缓存。
+	data, _ = os.ReadFile(path)
+	var cf2 cacheFile
+	if err := json.Unmarshal(data, &cf2); err != nil {
+		t.Fatal(err)
+	}
+	if len(cf2.Releases) != 1 {
+		t.Fatalf("旧缓存被空结果污染: %+v", cf2.Releases)
+	}
+}
+
 // 无缓存且源失败：维持原有"部分失败告警 / 全部失败报错"语义。
 func TestListRemoteNoCacheFails(t *testing.T) {
 	src := &fakeSrc{err: errors.New("boom")}

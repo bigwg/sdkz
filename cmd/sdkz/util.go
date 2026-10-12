@@ -35,7 +35,7 @@ type progressPrinter struct {
 }
 
 func newProgressPrinter() *progressPrinter {
-	return &progressPrinter{tty: isTTY(os.Stderr), barWidth: 30}
+	return &progressPrinter{tty: isTTY(os.Stderr), barWidth: 20}
 }
 
 // OnProgress 实现 service.ProgressFunc。
@@ -51,6 +51,7 @@ func (p *progressPrinter) OnProgress(done, total int64, stage string) {
 		fmt.Fprintf(os.Stderr, "正在%s…\n", stage)
 		p.lastDone = 0
 		p.lastTime = time.Time{}
+		p.lastLogTime = time.Time{} // 新阶段首帧立即渲染
 	}
 
 	// 本阶段已渲染完 100% 并换行，忽略后续重复回调（防止画出第二条进度条）。
@@ -66,22 +67,30 @@ func (p *progressPrinter) OnProgress(done, total int64, stage string) {
 	if p.lastTime.IsZero() {
 		p.lastTime = now
 		p.lastDone = done
-		p.lastLogTime = now
 	}
 
+	// 下载层按块高频回调（数毫秒一次）：TTY 渲染限频 1s，
+	// 避免进度条闪烁与瞬时速度抖动；完成帧（100%）立即渲染。
+	isFinal := done >= total
 	if p.tty {
+		if !isFinal && !p.lastLogTime.IsZero() && now.Sub(p.lastLogTime) < time.Second {
+			return
+		}
+		p.lastLogTime = now
 		p.renderBar(done, total, now)
 	} else {
 		p.renderLog(done, total, now)
 	}
 
-	if done >= total {
+	if isFinal {
 		p.finishLine()
 		p.finished = true
 	}
 }
 
 // renderBar 在 TTY 上以单行回车刷新进度条。
+// 整行控制在 80 列内（bar 20 格 + 定宽速度字段），避免窄终端折行
+// 导致 \r 无法完整覆盖上一帧、行尾残留杂散字符。
 func (p *progressPrinter) renderBar(done, total int64, now time.Time) {
 	pct := float64(done) / float64(total)
 	filled := int(pct * float64(p.barWidth))
@@ -90,7 +99,7 @@ func (p *progressPrinter) renderBar(done, total int64, now time.Time) {
 	}
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", p.barWidth-filled)
 	speed := p.calcSpeed(done, now)
-	fmt.Fprintf(os.Stderr, "\r  [%s] %5.1f%%  %s / %s  (%s/s)",
+	fmt.Fprintf(os.Stderr, "\r  [%s] %5.1f%%  %s / %s  (%8s/s)",
 		bar, pct*100, domain.FormatBytes(done), domain.FormatBytes(total), speed)
 	p.printed = true
 }
@@ -107,7 +116,8 @@ func (p *progressPrinter) renderLog(done, total int64, now time.Time) {
 		p.stage, pct, domain.FormatBytes(done), domain.FormatBytes(total), speed)
 }
 
-// calcSpeed 估算瞬时下载速度（B/s），零值返回 "-"。
+// calcSpeed 估算下载速度（B/s）：两次渲染之间的平均速率
+// （TTY 限频后约为 1 秒窗口，天然平滑），零值返回 "-"。
 func (p *progressPrinter) calcSpeed(done int64, now time.Time) string {
 	elapsed := now.Sub(p.lastTime).Seconds()
 	if elapsed <= 0 {

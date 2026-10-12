@@ -45,7 +45,11 @@ func (m *Manager) readCache(candID, vendorID string) ([]*domain.Release, time.Ti
 }
 
 // writeCache 原子写入缓存（先写临时文件再重命名，避免读到半截 JSON）。
+// 空列表拒绝写入：空缓存无法用于回退，只会污染可用性判断。
 func (m *Manager) writeCache(candID, vendorID string, rels []*domain.Release) {
+	if len(rels) == 0 {
+		return
+	}
 	path := m.CachePath(candID, vendorID)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return

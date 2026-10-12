@@ -49,3 +49,28 @@ func TestProgressPrinterNoDuplicateFinish(t *testing.T) {
 		t.Fatalf("新阶段应正常渲染进度:\n%s", out)
 	}
 }
+
+// TestProgressPrinterTTYThrottle 验证 TTY 下高频回调被限频为约 1s 一帧，
+// 首帧与 100% 完成帧必须立即渲染。
+func TestProgressPrinterTTYThrottle(t *testing.T) {
+	p := &progressPrinter{tty: true, barWidth: 10}
+
+	out := captureStderr(t, func() {
+		p.OnProgress(10, 100, "更新下载") // 首帧，立即渲染
+		// 同一瞬间内的高频回调（模拟下载层逐块上报）。
+		for i := int64(20); i < 100; i += 10 {
+			p.OnProgress(i, 100, "更新下载")
+		}
+		p.OnProgress(100, 100, "更新下载") // 完成帧，必须渲染
+	})
+
+	if n := strings.Count(out, "10.0%"); n != 1 {
+		t.Fatalf("首帧应渲染一次，实际 %d 次:\n%s", n, out)
+	}
+	if n := strings.Count(out, "100.0%"); n != 1 {
+		t.Fatalf("完成帧应渲染一次，实际 %d 次:\n%s", n, out)
+	}
+	if strings.Contains(out, "90.0%") || strings.Contains(out, "50.0%") {
+		t.Fatalf("中间帧应被限频跳过:\n%s", out)
+	}
+}
