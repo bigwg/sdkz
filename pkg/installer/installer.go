@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -121,13 +123,20 @@ func (i *Installer) Install(ctx context.Context, rel *domain.Release, progress P
 	case art.SHA256 != "":
 		checksum = art.SHA256
 	case art.ChecksumURL != "":
+		// 下载文件名：用于在多文件校验清单（如 Node SHASUMS256.txt）中定位对应哈希。
+		checksumName := artifactFilename(art.URL)
 		sumURLs := append([]string{i.cfg.ApplyMirror(art.ChecksumURL)},
 			applyMirrors(i.cfg, art.FallbackChecksumURLs)...)
 		var err error
 		for _, u := range sumURLs {
-			checksum, err = FetchChecksum(ctx, i.client, u, art.ChecksumType)
+			checksum, err = FetchChecksum(ctx, i.client, u, art.ChecksumType, checksumName)
 			if err == nil {
 				break
+			}
+			// 清单存在但缺少目标文件的哈希（如镜像同步不同步）→ 直接失败，
+			// 不得跳过校验安装来源不明的文件。
+			if errors.Is(err, ErrChecksumNotFound) {
+				return "", fmt.Errorf("获取校验值失败: %w", err)
 			}
 		}
 		if err != nil {
@@ -234,4 +243,12 @@ func applyMirrors(cfg *config.Config, urls []string) []string {
 		out = append(out, cfg.ApplyMirror(u))
 	}
 	return out
+}
+
+// artifactFilename 从下载地址提取文件名（镜像替换后路径末段保持不变）。
+func artifactFilename(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil && u.Path != "" {
+		return path.Base(u.Path)
+	}
+	return path.Base(rawURL)
 }
