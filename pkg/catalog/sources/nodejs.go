@@ -33,26 +33,53 @@ type nodeVersion struct {
 	Files   []string    `json:"files"`
 }
 
-// nodePlatformKey 返回 Node 官方目录中的平台 key。
-func nodePlatformKey(p platform.Platform) string {
+// nodePlatformSpec 描述目标平台在 Node.js 官方 index.json 中的 files 键，
+// 以及下载产物文件名中的平台标识。
+//
+// 两者并不一致，这是 Windows / macOS 曾"解析不到任何版本"的根因：
+//
+//	Windows：files=win-x64-zip / win-arm64-zip   产物=node-vX-win-x64.zip
+//	macOS  ：files=osx-x64-tar / osx-arm64-tar   产物=node-vX-darwin-x64.tar.gz
+//	Linux  ：files=linux-x64 / linux-arm64        产物=node-vX-linux-x64.tar.gz
+//
+// fileKeys 中保留裸名（如 win-x64）作为旧版清单/镜像格式的兼容项。
+type nodePlatformSpec struct {
+	fileKeys []string // 任一命中即表示该版本提供了当前平台可安装的产物
+	name     string   // 产物文件名中的平台标识
+	ext      string   // 归档扩展名
+}
+
+func nodePlatformSpecFor(p platform.Platform) (nodePlatformSpec, bool) {
 	switch p.OS {
 	case "linux":
 		if p.Arch == "arm64" {
-			return "linux-arm64"
+			return nodePlatformSpec{[]string{"linux-arm64"}, "linux-arm64", "tar.gz"}, true
 		}
-		return "linux-x64"
+		return nodePlatformSpec{[]string{"linux-x64"}, "linux-x64", "tar.gz"}, true
 	case "darwin":
 		if p.Arch == "arm64" {
-			return "osx-arm64"
+			return nodePlatformSpec{[]string{"osx-arm64-tar", "osx-arm64", "darwin-arm64"}, "darwin-arm64", "tar.gz"}, true
 		}
-		return "osx-x64"
+		return nodePlatformSpec{[]string{"osx-x64-tar", "osx-x64", "darwin-x64"}, "darwin-x64", "tar.gz"}, true
 	case "windows":
 		if p.Arch == "arm64" {
-			return "win-arm64"
+			return nodePlatformSpec{[]string{"win-arm64-zip", "win-arm64"}, "win-arm64", "zip"}, true
 		}
-		return "win-x64"
+		return nodePlatformSpec{[]string{"win-x64-zip", "win-x64"}, "win-x64", "zip"}, true
 	}
-	return ""
+	return nodePlatformSpec{}, false
+}
+
+// hasArtifact 判断该版本是否提供了当前平台可安装的归档产物。
+func (s nodePlatformSpec) hasArtifact(files []string) bool {
+	for _, f := range files {
+		for _, k := range s.fileKeys {
+			if f == k {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // fetchIndex 从官方源拉取版本清单，失败时回退到国内镜像。
@@ -72,28 +99,17 @@ func (s *nodejs) fetchIndex(ctx context.Context) ([]nodeVersion, error) {
 }
 
 func (s *nodejs) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Release, error) {
-	key := nodePlatformKey(p)
-	if key == "" {
+	spec, ok := nodePlatformSpecFor(p)
+	if !ok {
 		return nil, fmt.Errorf("Node.js 暂不支持平台 %s", p.String())
 	}
 	versions, err := s.fetchIndex(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ext := "tar.gz"
-	if p.IsWindows() {
-		ext = "zip"
-	}
 	var rels []*domain.Release
 	for _, v := range versions {
-		hasFile := false
-		for _, f := range v.Files {
-			if f == key {
-				hasFile = true
-				break
-			}
-		}
-		if !hasFile {
+		if !spec.hasArtifact(v.Files) {
 			continue
 		}
 		lts := false
@@ -109,10 +125,10 @@ func (s *nodejs) Fetch(ctx context.Context, p platform.Platform) ([]*domain.Rele
 			Stable:  true,
 			LTS:     lts,
 			Artifact: &domain.Artifact{
-				URL:          baseURL + "/node-" + v.Version + "-" + key + "." + ext,
+				URL:          baseURL + "/node-" + v.Version + "-" + spec.name + "." + spec.ext,
 				ChecksumURL:  baseURL + "/SHASUMS256.txt",
 				ChecksumType: "sha256",
-				Ext:          ext,
+				Ext:          spec.ext,
 				Strip:        1,
 			},
 		})

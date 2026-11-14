@@ -69,8 +69,9 @@ func TestGolangFetch(t *testing.T) {
 
 func TestNodeJSFetch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 与官方 index.json 一致：Windows/macOS 的 files 键带产物形态后缀。
 		w.Write([]byte(`[
-			{"version":"v22.11.0","lts":"Jod","files":["linux-x64","linux-arm64","osx-x64","win-x64"]},
+			{"version":"v22.11.0","lts":"Jod","files":["linux-x64","linux-arm64","osx-x64-tar","win-x64-zip"]},
 			{"version":"v23.0.0","lts":false,"files":["linux-x64"]}
 		]`))
 	}))
@@ -98,6 +99,57 @@ func TestNodeJSFetch(t *testing.T) {
 	}
 	if checksumURL == "" || !strings.Contains(checksumURL, "/SHASUMS256.txt") {
 		t.Errorf("校验值地址异常: %s", checksumURL)
+	}
+}
+
+// TestNodeJSFetchPerPlatform 回归 Windows/macOS 解析不到任何版本的问题：
+// 官方 index.json 的 files 键与产物文件名中的平台标识并不相同。
+func TestNodeJSFetchPerPlatform(t *testing.T) {
+	const fixture = `[
+		{"version":"v22.11.0","lts":"Jod","files":["linux-x64","linux-arm64","osx-x64-tar","osx-arm64-tar","win-x64-zip","win-arm64-zip"]},
+		{"version":"v23.0.0","lts":false,"files":["headers","src","osx-x64-pkg","win-x64-msi"]}
+	]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(fixture))
+	}))
+	defer srv.Close()
+
+	cases := []struct {
+		os, arch string
+		wantName string
+		wantExt  string
+	}{
+		{"linux", "amd64", "linux-x64", "tar.gz"},
+		{"linux", "arm64", "linux-arm64", "tar.gz"},
+		{"darwin", "amd64", "darwin-x64", "tar.gz"},
+		{"darwin", "arm64", "darwin-arm64", "tar.gz"},
+		{"windows", "amd64", "win-x64", "zip"},
+		{"windows", "arm64", "win-arm64", "zip"},
+	}
+	for _, c := range cases {
+		t.Run(c.os+"-"+c.arch, func(t *testing.T) {
+			s := NewNodeJS(&http.Client{})
+			s.SetBaseURL(srv.URL)
+			rels, err := s.Fetch(context.Background(), platform.FromParts(c.os, c.arch))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// 第二个版本只有 msi/pkg/exe，无可安装归档，应被过滤。
+			if len(rels) != 1 {
+				t.Fatalf("应返回 1 个版本，得到 %d", len(rels))
+			}
+			art := rels[0].Artifact
+			wantURL := srv.URL + "/dist/v22.11.0/node-v22.11.0-" + c.wantName + "." + c.wantExt
+			if art.URL != wantURL {
+				t.Errorf("下载地址错误:\n got %s\nwant %s", art.URL, wantURL)
+			}
+			if art.Ext != c.wantExt {
+				t.Errorf("扩展名错误: got %s, want %s", art.Ext, c.wantExt)
+			}
+			if !strings.Contains(art.ChecksumURL, "/SHASUMS256.txt") {
+				t.Errorf("校验值地址异常: %s", art.ChecksumURL)
+			}
+		})
 	}
 }
 

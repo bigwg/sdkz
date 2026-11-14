@@ -198,6 +198,17 @@ func (m *Manager) ListRemote(ctx context.Context, cand *domain.Candidate, vendor
 	}
 	// 全部发行版均失败才返回错误；部分失败仅告警。
 	if len(all) == 0 && len(failed) > 0 {
+		// 附带底层原因（网络失败 / 未解析到版本），避免只输出一句笼统的错误。
+		var reasons []string
+		for _, e := range errs {
+			if e != nil {
+				reasons = append(reasons, e.Error())
+			}
+		}
+		if len(reasons) > 0 {
+			return nil, fmt.Errorf("%s 所有发行版获取失败: %s（原因: %s）",
+				cand.ID, strings.Join(failed, ", "), strings.Join(reasons, "; "))
+		}
 		return nil, fmt.Errorf("%s 所有发行版获取失败: %s", cand.ID, strings.Join(failed, ", "))
 	}
 	if len(failed) > 0 {
